@@ -1,4 +1,4 @@
-/* Changed 2026-10-29 (fork): saves and loads the Screen, Picture Width and Overscan settings. */
+/* Changed 2026-10-29 (fork): saves and loads the Screen, Picture Width, Overscan, Menu Music and Menu Sounds settings. */
 #include <argz.h>
 #include <langinfo.h>
 #include <stdcountof.h>
@@ -160,6 +160,8 @@ int config_update_global(bool checkConfigDevice) {
 	fprintf(fp, "Swiss Screen=%s\r\n", uiWidescreenStr[swissSettings.uiWidescreen ? 1 : 0]);
 	fprintf(fp, "Swiss Picture Width=%s\r\n", uiPictureWidthStr[swissSettings.uiPictureWidth ? 1 : 0]);
 	fprintf(fp, "Swiss Overscan=%i\r\n", swissSettings.uiOverscan);
+	fprintf(fp, "Swiss Menu Music=%s\r\n", swissSettings.uiMusicOff ? "No":"Yes");
+	fprintf(fp, "Swiss Menu Sounds=%s\r\n", swissSettings.uiSoundsOff ? "No":"Yes");
 	fprintf(fp, "Apps Video Mode=%s\r\n", uiVModeStr[swissSettings.appsVMode]);
 	fprintf(fp, "Disable PAD Recalibration=%s\r\n", swissSettings.disableRecalibration ? "Yes":"No");
 	fprintf(fp, "Disable PAD Rumble=%s\r\n", swissSettings.disableRumble ? "Yes":"No");
@@ -532,6 +534,12 @@ void config_parse_legacy(char *configData, void (*progress_indicator)(char*, int
 					if(swissSettings.uiOverscan < 0) swissSettings.uiOverscan = 0;
 					if(swissSettings.uiOverscan > 10) swissSettings.uiOverscan = 10;
 				}
+				else if(!strcmp("Swiss Menu Music", name)) {
+					swissSettings.uiMusicOff = !strcmp("No", value);
+				}
+				else if(!strcmp("Swiss Menu Sounds", name)) {
+					swissSettings.uiSoundsOff = !strcmp("No", value);
+				}
 				else if(!strcmp("Enable Debug", name)) {
 					swissSettings.enableUSBGecko = !strcmp("Yes", value) ? USBGECKO_MEMCARD_SLOT_B : USBGECKO_OFF;
 				}
@@ -894,6 +902,12 @@ void config_parse_global(char *configData) {
 					swissSettings.uiOverscan = atoi(value);
 					if(swissSettings.uiOverscan < 0) swissSettings.uiOverscan = 0;
 					if(swissSettings.uiOverscan > 10) swissSettings.uiOverscan = 10;
+				}
+				else if(!strcmp("Swiss Menu Music", name)) {
+					swissSettings.uiMusicOff = !strcmp("No", value);
+				}
+				else if(!strcmp("Swiss Menu Sounds", name)) {
+					swissSettings.uiSoundsOff = !strcmp("No", value);
 				}
 				else if(!strcmp("Disable PAD Recalibration", name)) {
 					swissSettings.disableRecalibration = !strcmp("Yes", value);

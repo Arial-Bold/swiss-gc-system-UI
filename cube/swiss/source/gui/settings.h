@@ -1,4 +1,4 @@
-/* Changed 2026-10-29 (fork): Resolution moved to the Interface page, with Screen, Picture Width and Overscan. */
+/* Changed 2026-10-29 (fork): Resolution moved to the Interface page, with Screen, Picture Width, Overscan, Menu Music and Menu Sounds. */
 #ifndef SETTINGS_H_
 #define SETTINGS_H_
 
@@ -55,6 +55,8 @@ enum SETTINGS_INTERFACE {
 	SET_UI_WIDESCREEN,
 	SET_UI_PICTUREWIDTH,
 	SET_UI_OVERSCAN,
+	SET_UI_MUSIC,
+	SET_UI_SOUNDS,
 	SET_FILEBROWSER_TYPE,
 	SET_APPSBROWSER_TYPE,
 	SET_GAMEBROWSER_TYPE,

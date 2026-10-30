@@ -1,4 +1,4 @@
-/* Changed 2026-10-29 (fork): screen shape settings for Swiss's own screens. */
+/* Changed 2026-10-29 (fork): screen shape, menu music and menu sounds settings for Swiss's own screens. */
 /* swiss.h 
 	- defines and externs
  */
@@ -197,6 +197,8 @@ typedef struct {
 	int uiWidescreen;	// Swiss's own screens: 0 = 4:3, 1 = 16:9
 	int uiPictureWidth;	// 0 = Full (704), 1 = Standard (640)
 	int uiOverscan;		// percent the screens are pulled in from the edges
+	int uiMusicOff;		// background music on Swiss's screens (0 = on)
+	int uiSoundsOff;	// menu sounds (0 = on)
 } SwissSettings;
 extern SwissSettings swissSettings;
 

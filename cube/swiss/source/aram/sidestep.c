@@ -1,3 +1,4 @@
+/* Changed 2026-10-29 (fork): stops the menu music and sounds before ARAM is used to load a program. */
 /****************************************************************************
 * SideStep DOL Loading
 *
@@ -22,6 +23,7 @@
 #include "elf.h"
 #include "gui/FrameBufferMagic.h"
 #include "patcher.h"
+#include "gui/uiaudio.h"
 
 #define ARAMSTART 0x8000
 
@@ -322,6 +324,9 @@ int DOLtoARAM(unsigned char *dol, char *argz, size_t argz_len)
   size_t envz_len = 0;
   struct __argv argv;
 
+  /*** The menu music and sounds use ARAM too: stop them first ***/
+  uiAudioShutdown();
+
   /*** Make sure ARAM subsystem is alive! ***/
   AR_Reset();
   AR_Init(NULL, 0); /*** No stack - we need it all ***/
@@ -440,6 +445,9 @@ int ELFtoARAM(unsigned char *elf, char *argz, size_t argz_len)
   size_t envz_len = 0;
   struct __argv argv;
 
+  /*** The menu music and sounds use ARAM too: stop them first ***/
+  uiAudioShutdown();
+
   /*** Make sure ARAM subsystem is alive! ***/
   AR_Reset();
   AR_Init(NULL, 0); /*** No stack - we need it all ***/
@@ -518,6 +526,9 @@ int ELFtoARAM(unsigned char *elf, char *argz, size_t argz_len)
 
 int BINtoARAM(unsigned char *bin, size_t len, unsigned int entrypoint, unsigned int minaddress)
 {
+  /*** The menu music and sounds use ARAM too: stop them first ***/
+  uiAudioShutdown();
+
   /*** Make sure ARAM subsystem is alive! ***/
   AR_Reset();
   AR_Init(NULL, 0); /*** No stack - we need it all ***/

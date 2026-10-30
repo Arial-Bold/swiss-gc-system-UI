@@ -1,4 +1,4 @@
-/* Changed 2026-10-29 (fork): Resolution, Screen, Picture Width and Overscan on the Interface page; System look rows. */
+/* Changed 2026-10-29 (fork): Resolution, Screen, Picture Width, Overscan, Menu Music and Menu Sounds on the Interface page; System look rows. */
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -169,6 +169,13 @@ static char *tooltips_interface[PAGE_INTERFACE_MAX+1] = {
 		"that hide part of it. Raise it until the title bar and the buttons\n"
 		"along the bottom are fully in view.\n\n"
 		"Only changes Swiss's own screens, not games.",
+	[SET_UI_MUSIC] = "Menu Music:\n\n"
+		"A light, mellow tune that plays quietly on Swiss's screens.\n"
+		"It stops before a game or program starts, and waits while the\n"
+		"MP3 player is open.",
+	[SET_UI_SOUNDS] = "Menu Sounds:\n\n"
+		"Soft sounds for moving around and choosing things on Swiss's\n"
+		"screens. They stop before a game or program starts.",
 	[SET_FILEBROWSER_TYPE] = "File Browser Type:\n\n"
 		"Standard - Displays files with minimal detail. (default)\n\n"
 		"Fullwidth - Displays files across the entire screen while hiding\n"
@@ -486,7 +493,7 @@ uiDrawObj_t* settings_draw_page(int page_num, int option, ConfigEntry *gameConfi
 		int scrollBarTabHeight = (int)((float)scrollBarHeight/(float)SET_PAGE_2_BACK);
 		DrawAddChild(page, DrawVertScrollBar(getVideoMode()->fbWidth-45, 110, 25, scrollBarHeight, (float)((float)option/(float)(SET_PAGE_2_BACK-1)),scrollBarTabHeight));
 		DrawAddChild(page, DrawLabel(page_x_ofs_key, 77, "Interface Settings (2/6):"));
-		if(option < SET_AUTOBOOT) {
+		if(option < SET_SHOW_HIDDEN) {
 			sprintf(uiVModeStr, "%s%s", getVideoModeString(getVideoModeFromSwissSetting(swissSettings.uiVMode)), swissSettings.uiVMode == 0 ? " (Auto) " : "");
 			drawSettingEntryString(page, &page_y_ofs, "Resolution:", uiVModeStr, option == SET_SWISS_VIDEOMODE, true);
 			drawSettingEntryString(page, &page_y_ofs, "Screen:", uiWidescreenStr[swissSettings.uiWidescreen ? 1 : 0], option == SET_UI_WIDESCREEN, true);
@@ -494,14 +501,16 @@ uiDrawObj_t* settings_draw_page(int page_num, int option, ConfigEntry *gameConfi
 			if(swissSettings.uiOverscan > 0) sprintf(uiOverscanStr, "%i%%", swissSettings.uiOverscan);
 			else strcpy(uiOverscanStr, "Off");
 			drawSettingEntryString(page, &page_y_ofs, "Overscan:", uiOverscanStr, option == SET_UI_OVERSCAN, true);
+			drawSettingEntryBoolean(page, &page_y_ofs, "Menu Music:", !swissSettings.uiMusicOff, option == SET_UI_MUSIC, true);
+			drawSettingEntryBoolean(page, &page_y_ofs, "Menu Sounds:", !swissSettings.uiSoundsOff, option == SET_UI_SOUNDS, true);
 			drawSettingEntryString(page, &page_y_ofs, "File Browser Type:", fileBrowserTypeStr[swissSettings.fileBrowserType], option == SET_FILEBROWSER_TYPE, true);
 			drawSettingEntryString(page, &page_y_ofs, "File Browser Type for apps:", fileBrowserTypeStr[swissSettings.appsBrowserType], option == SET_APPSBROWSER_TYPE, true);
 			drawSettingEntryString(page, &page_y_ofs, "File Browser Type for games:", fileBrowserTypeStr[swissSettings.gameBrowserType], option == SET_GAMEBROWSER_TYPE, true);
 			drawSettingEntryBoolean(page, &page_y_ofs, "File Management:", swissSettings.enableFileManagement, option == SET_FILE_MGMT, true);
 			drawSettingEntryString(page, &page_y_ofs, "Recent List:", recentListLevelStr[swissSettings.recentListLevel], option == SET_RECENT_LIST, true);
+		} else {
 			drawSettingEntryBoolean(page, &page_y_ofs, "Show hidden files:", swissSettings.showHiddenFiles, option == SET_SHOW_HIDDEN, true);
 			drawSettingEntryBoolean(page, &page_y_ofs, "Hide unknown file types:", swissSettings.hideUnknownFileTypes, option == SET_HIDE_UNK, true);
-		} else {
 			drawSettingEntryBoolean(page, &page_y_ofs, "Boot without prompts:", swissSettings.autoBoot, option == SET_AUTOBOOT, true);
 			drawSettingEntryString(page, &page_y_ofs, "Load at startup:", getAutoLoadDeviceName(&swissSettings), option == SET_AUTOLOAD, true);
 			drawSettingEntryString(page, &page_y_ofs, "Flatten directory:", swissSettings.flattenDir, option == SET_FLATTEN_DIR, true);
@@ -855,6 +864,12 @@ void settings_toggle(int page, int option, int direction, ConfigEntry *gameConfi
 				swissSettings.uiOverscan += direction;
 				if(swissSettings.uiOverscan < 0) swissSettings.uiOverscan = 0;
 				if(swissSettings.uiOverscan > SYS_OVERSCAN_MAX) swissSettings.uiOverscan = SYS_OVERSCAN_MAX;
+			break;
+			case SET_UI_MUSIC:
+				swissSettings.uiMusicOff ^= 1;
+			break;
+			case SET_UI_SOUNDS:
+				swissSettings.uiSoundsOff ^= 1;
 			break;
 			case SET_FILEBROWSER_TYPE:
 				swissSettings.fileBrowserType += direction;

@@ -1,4 +1,4 @@
-/* Changed 2026-10-29 (fork): the System look (see SystemLook.c) and 16:9 / overscan. */
+/* Changed 2026-10-29 (fork): the System look (see SystemLook.c), 16:9 / overscan, and menu music and sounds (see uiaudio.c). */
 /* -----------------------------------------------------------
       FrameBufferMagic.c - Framebuffer routines with GX
 	      - by emu_kidid & sepp256
@@ -30,6 +30,7 @@
 #include "dolparameters.h"
 #include "cheats.h"
 #include "SystemLook.h"
+#include "uiaudio.h"
 
 #define GUI_MSGBOX_ALPHA 225
 
@@ -2303,6 +2304,7 @@ static void *videoUpdate(void *videoEventQueue) {
 		VIDEO_ConfigurePan(0, 0, width, height);
 		VIDEO_Flush();
 		VIDEO_WaitForFlush();
+		uiAudioUpdate();	// menu sounds for button presses, and the music's loudness
 	}
 	return NULL;
 }
@@ -2363,6 +2365,9 @@ void DrawInit(GXRModeObj *videoMode, bool black) {
 	DrawPublish(container);
 	LWP_MutexInit(&_videomutex, false);
 	LWP_CreateThread(&video_thread, videoUpdate, videoEventQueue, video_thread_stack, VIDEO_STACK_SIZE, VIDEO_PRIORITY);
+	if(!black) {
+		uiAudioInit();	// background music and menu sounds
+	}
 }
 
 void DrawLoadBackdrop(DEVICEHANDLER_INTERFACE *device) {
@@ -2439,6 +2444,7 @@ void DrawLoadBackdrop(DEVICEHANDLER_INTERFACE *device) {
 }
 
 void DrawShutdown() {
+	uiAudioShutdown();	// nothing of the menu's sound carries into what's launched
 	mutex_t mutex = _videomutex;
 	_videomutex = LWP_MUTEX_NULL;
 	LWP_MutexDestroy(mutex);

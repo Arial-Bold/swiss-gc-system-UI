@@ -1,3 +1,4 @@
+/* Changed 2026-10-29 (fork): the menu music waits while the MP3 player is open. */
 #include <gccore.h>
 #include <stdlib.h>
 #include <mp3player.h>
@@ -7,6 +8,7 @@
 #include "mp3.h"
 #include "gui/FrameBufferMagic.h"
 #include "gui/IPLFontWrite.h"
+#include "gui/uiaudio.h"
 
 static int useShuffle = 0;
 static int volume = 192;
@@ -114,6 +116,7 @@ int play_mp3(file_handle *file, int numFiles, int curMP3) {
 void mp3_player(file_handle** allFiles, int numFiles, file_handle* curFile) {
 	// Initialise the audio subsystem
 	MP3Player_Init();
+	uiAudioHoldMusic(true);	// the menu music waits while the MP3 player is open
 	MP3Player_Volume(volume);
 	
 	// Find all the .mp3 files in the set of allFiles, and also where our file is.
@@ -146,5 +149,6 @@ void mp3_player(file_handle** allFiles, int numFiles, file_handle* curFile) {
 	}
 	
 	MP3Player_Stop();
+	uiAudioHoldMusic(false);
 }
 
