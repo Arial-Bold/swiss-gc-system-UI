@@ -1,3 +1,4 @@
+/* Changed 2026-10-29 (fork): Picture Width setting (704 or 640) for Swiss's own screens. */
 #include <gccore.h>
 #include <stdlib.h>
 #include <malloc.h>
@@ -234,6 +235,10 @@ void updateVideoMode(GXRModeObj *m) {
 	}
 	if(in_range(swissSettings.aveCompat, GCDIGITAL_COMPAT, GCVIDEO_COMPAT) && swissSettings.rt4kOptim) {
 		m->viWidth = m->fbWidth;
+		m->viXOrigin = 40;
+	} else if(swissSettings.uiPictureWidth) {
+		// Standard (640): a little narrower, centred in the 720-pixel line
+		m->viWidth = 640;
 		m->viXOrigin = 40;
 	} else {
 		m->viWidth = 704;

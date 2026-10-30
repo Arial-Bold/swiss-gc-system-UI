@@ -1,3 +1,4 @@
+/* Changed 2026-10-29 (fork): Resolution moved to the Interface page, with Screen, Picture Width and Overscan. */
 #ifndef SETTINGS_H_
 #define SETTINGS_H_
 
@@ -27,10 +28,7 @@ enum SETTINGS_GLOBAL {
 	SET_SYS_VIDEO,
 	SET_SCREEN_POS,
 	SET_SYS_LANG,
-	SET_SYS_TIMEZONE,
 	SET_CONFIG_DEV,
-	SET_SWISS_VIDEOMODE,
-	SET_APPS_VIDEOMODE,
 	SET_INIT_DRIVE,
 	SET_STOP_MOTOR,
 	SET_AUDIO_BUFFER,
@@ -51,6 +49,10 @@ enum SETTINGS_GLOBAL {
 #define PAGE_GLOBAL_MAX (SET_PAGE_1_CANCEL)
 
 enum SETTINGS_INTERFACE {
+	SET_SWISS_VIDEOMODE=0,	// Resolution
+	SET_UI_WIDESCREEN,
+	SET_UI_PICTUREWIDTH,
+	SET_UI_OVERSCAN,
 	SET_FILEBROWSER_TYPE,
 	SET_APPSBROWSER_TYPE,
 	SET_GAMEBROWSER_TYPE,
@@ -87,7 +89,6 @@ enum SETTINGS_NETWORK {
 	SET_SMB_SHARE,
 	SET_SMB_USER,
 	SET_SMB_PASS,
-	SET_SNTP_HOSTIP,
 	SET_RT4K_HOSTIP,
 	SET_RT4K_PORT,
 	SET_PAGE_3_BACK,
@@ -178,6 +179,8 @@ extern char *enableUSBGeckoStr[];
 extern char *simulatedMemSizeStr[];
 extern const int simulatedMemSizeInt[];
 extern char *uiVModeStr[];
+extern char *uiWidescreenStr[];
+extern char *uiPictureWidthStr[];
 extern char *gameVModeStr[];
 extern char *forceHScaleStr[];
 extern char *forceVFilterStr[];
@@ -205,4 +208,4 @@ extern char *recentListLevelStr[];
 
 int show_settings(int page, int option, ConfigEntry *config);
 
-#endif
+#endif

@@ -1,3 +1,4 @@
+/* Changed 2026-10-29 (fork): the System look (see SystemLook.c) and 16:9 / overscan. */
 /* -----------------------------------------------------------
       FrameBufferMagic.c - Framebuffer routines with GX
 	      - by emu_kidid & sepp256
@@ -16,7 +17,7 @@
 #include <math.h>
 #include <ogc/exi.h>
 #include <gctypes.h>
-#include <ogc/timesupp.h>
+#include <ogc/lwp_watchdog.h>
 #include "deviceHandler.h"
 #include "FrameBufferMagic.h"
 #include "IPLFontWrite.h"
@@ -28,6 +29,7 @@
 #include "btns.h"
 #include "dolparameters.h"
 #include "cheats.h"
+#include "SystemLook.h"
 
 #define GUI_MSGBOX_ALPHA 225
 
@@ -88,6 +90,7 @@ GXTexObj gcnetTexObj;
 GXTexObj kunaigcTexObj;
 
 static char fbTextBuffer[256];
+static bool customBackdrop = false;	// a backdrop.tpl was loaded from the card
 
 // Video threading vars
 #define VIDEO_STACK_SIZE (64*1024)
@@ -111,11 +114,12 @@ enum VideoEventType
 	EV_CONTAINER,
 	EV_MENUBUTTONS,
 	EV_TOOLTIP,
-	EV_TITLEBAR
+	EV_TITLEBAR,
+	EV_SETTINGROW
 };
 
 char * typeStrings[] = {"TexObj", "MsgBox", "Image", "Progress", "SelectableButton", "EmptyBox", "TransparentBox",
-						"FileBrowserButton", "VertScrollbar", "StyledLabel", "Container", "MenuButtons", "Tooltip", "TitleBar"};
+						"FileBrowserButton", "VertScrollbar", "StyledLabel", "Container", "MenuButtons", "Tooltip", "TitleBar", "SettingRow"};
 
 typedef struct drawTexObjEvent {
 	GXTexObj *texObj;
@@ -164,8 +168,6 @@ typedef struct drawStyledLabelEvent {
 	bool showCaret;
 	int caretPosition;
 	GXColor caretColor;
-	bool showEllipsis;
-	int maxSize;
 } drawStyledLabelEvent_t;
 
 typedef struct drawSelectableButtonEvent {
@@ -183,6 +185,7 @@ typedef struct drawBoxEvent {
 	int x2;
 	int y2;
 	GXColor backfill;
+	bool highlight;	// a selected entry (frosted, with the gold ring)
 } drawBoxEvent_t;
 
 typedef struct drawFileBrowserButtonEvent {
@@ -198,6 +201,17 @@ typedef struct drawFileBrowserButtonEvent {
 	bool isCarousel;	// Draw this as a full "card" style
 	int distFromMiddle;	// 0 = full, -1 spine only but large then gradually getting smaller as dist increases from 0
 } drawFileBrowserButtonEvent_t;
+
+typedef struct drawSettingRowEvent {
+	int x1;
+	int y1;
+	int x2;
+	int y2;
+	bool selected;
+	bool stripe;
+	int arrowLeftX;	// 0 = no arrows
+	int arrowRightX;
+} drawSettingRowEvent_t;
 
 typedef struct drawMenuButtonsEvent {
 	int selection;
@@ -391,7 +405,6 @@ static void init_textures()
 
 static void drawInit()
 {
-	Mtx44 GXprojection2D;
 	Mtx GXmodelView2D;
 
 	// Reset various parameters from gfx plugin
@@ -402,8 +415,7 @@ static void drawInit()
 	guMtxIdentity(GXmodelView2D);
 	GX_LoadTexMtxImm(GXmodelView2D,GX_TEXMTX0,GX_MTX2x4);
 	GX_LoadPosMtxImm(GXmodelView2D,GX_PNMTX0);
-	guOrtho(GXprojection2D, 0, 480, 0, 640, 0, 1);
-	GX_LoadProjectionMtx(GXprojection2D, GX_ORTHOGRAPHIC);
+	sysLoadProjection();	// 640x480 layout, widened for 16:9 and pulled in for overscan
 
 	GX_SetZMode(GX_DISABLE,GX_ALWAYS,GX_FALSE);
 
@@ -466,34 +478,30 @@ static void _drawRect(int x, int y, int width, int height, int depth, GXColor co
 	GX_End();
 }
 
-static void _DrawSimpleBox(int x, int y, int width, int height, int depth, GXColor fillColor, GXColor borderColor) 
-{
-	//Adjust for blank texture border
-	x-=4; y-=4; width+=8; height+=8;
-	
-	GX_InvalidateTexAll();
-	GX_LoadTexObj(&boxinnerTexObj, GX_TEXMAP0);
-
-	_drawRect(x, y, width/2, height/2, depth, fillColor, 0.0f, ((float)width/32), 0.0f, ((float)height/32));
-	_drawRect(x+(width/2), y, width/2, height/2, depth, fillColor, ((float)width/32), 0.0f, 0.0f, ((float)height/32));
-	_drawRect(x, y+(height/2), width/2, height/2, depth, fillColor, 0.0f, ((float)width/32), ((float)height/32), 0.0f);
-	_drawRect(x+(width/2), y+(height/2), width/2, height/2, depth, fillColor, ((float)width/32), 0.0f, ((float)height/32), 0.0f);
-
-	GX_InvalidateTexAll();
-	GX_LoadTexObj(&boxouterTexObj, GX_TEXMAP0);
-
-	_drawRect(x, y, width/2, height/2, depth, borderColor, 0.0f, ((float)width/32), 0.0f, ((float)height/32));
-	_drawRect(x+(width/2), y, width/2, height/2, depth, borderColor, ((float)width/32), 0.0f, 0.0f, ((float)height/32));
-	_drawRect(x, y+(height/2), width/2, height/2, depth, borderColor, 0.0f, ((float)width/32), ((float)height/32), 0.0f);
-	_drawRect(x+(width/2), y+(height/2), width/2, height/2, depth, borderColor, ((float)width/32), 0.0f, ((float)height/32), 0.0f);
-}
-
 // Internal
 static void _DrawImageNow(int textureId, int x, int y, int width, int height, int depth, float s1, float s2, float t1, float t2, int centered) {
 	u16 ss = 0, ts = 0;
 	GXTexObj *texObj = NULL;
 	GXTexObj *indTexObj = NULL;
 	GXColor color = (GXColor) {255,255,255,255};
+	
+	if(textureId == TEX_BACKDROP) {
+		if(!customBackdrop) {
+			// The System look's own backdrop, filling the screen whatever its shape
+			sysBegin();
+			sysBackdrop();
+			drawInit();
+			return;
+		}
+		// A backdrop from the card covers the whole screen too, cropped rather than stretched
+		float l, t, r, b;
+		sysViewBounds(&l, &t, &r, &b);
+		float sx = (r - l) / 640.0f, sy = (b - t) / 480.0f, sc = MAX(sx, sy);
+		x = (int)floorf(l); y = (int)floorf(t);
+		width = (int)ceilf(r) - x; height = (int)ceilf(b) - y;
+		s1 = 0.5f - 0.5f * sx / sc; s2 = 0.5f + 0.5f * sx / sc;
+		t1 = 0.5f - 0.5f * sy / sc; t2 = 0.5f + 0.5f * sy / sc;
+	}
 	
 	switch(textureId)
 	{
@@ -737,12 +745,6 @@ static void _DrawProgressBar(uiDrawObj_t *evt) {
 	int y1 = ((480/2) - (PROGRESS_BOX_HEIGHT/2));
 	int y2 = ((480/2) + (PROGRESS_BOX_HEIGHT/2));
 
-  	GXColor fillColor = (GXColor) {0,0,0,GUI_MSGBOX_ALPHA}; //black
-  	GXColor noColor = (GXColor) {0,0,0,0}; //blank
-	GXColor borderColor = (GXColor) {200,200,200,GUI_MSGBOX_ALPHA}; //silver
-	GXColor progressBarColor = (GXColor) {255,128,0,GUI_MSGBOX_ALPHA}; //orange
-	GXColor progressBarIndColor = (GXColor) {0xb3,0xd9,0xff,GUI_MSGBOX_ALPHA}; //orange
-	
 	if(data->miniMode) {	
 		int x = 30, y = 420;
 		if(data->miniModePos == PROGRESS_BOX_TOPRIGHT) {
@@ -763,7 +765,8 @@ static void _DrawProgressBar(uiDrawObj_t *evt) {
 		drawString(x+8, y, "Loading\205", 0.55f, ALIGN_LEFT, loadingColor);
 		return;
 	}
-	_DrawSimpleBox( x1, y1, x2-x1, y2-y1, 0, fillColor, borderColor);		
+	sysBegin();
+	sysPanel(x1, y1, x2-x1, y2-y1);
 	
 	int middleY = (y2+y1)/2;
 	if(data->indeterminate) {
@@ -789,20 +792,15 @@ static void _DrawProgressBar(uiDrawObj_t *evt) {
 			progressSize = 100-(data->percent%100);
 		}
 		
-		_DrawSimpleBox( (640/2 - progressBarWidth/2), y1+20,
-				(multiplier*100), 20, 0, noColor, borderColor); 
-		_DrawSimpleBox( (640/2 - progressBarWidth/2) + (progressStart*multiplier),
-				y1+20,
-				(multiplier*progressSize),
-				20, 0, progressBarIndColor, noColor);
+		// a gold segment sweeping along the groove
+		sysTrack((640/2 - progressBarWidth/2), y1+22, (multiplier*100), 16);
+		sysGoldFill((640/2 - progressBarWidth/2) + (progressStart*multiplier), y1+22, (multiplier*progressSize), 16);
 	}
 	else {
 		int multiplier = (PROGRESS_BOX_WIDTH-20)/100;
 		int progressBarWidth = multiplier*100;
-		_DrawSimpleBox( (640/2 - progressBarWidth/2), y1+20,
-				(multiplier*100), 20, 0, noColor, borderColor); 
-		_DrawSimpleBox( (640/2 - progressBarWidth/2), y1+20,
-				(multiplier*data->percent), 20, 0, progressBarColor, noColor); 
+		sysTrack((640/2 - progressBarWidth/2), y1+22, (multiplier*100), 16);
+		sysGoldFill((640/2 - progressBarWidth/2), y1+22, (multiplier*data->percent), 16);
 		sprintf(fbTextBuffer,"%d%%", data->percent);
 		bool displaySpeed = data->speed != 0;
 		drawString(displaySpeed ? (x1 + 80) : (640/2), middleY+30, fbTextBuffer, 1.0f, ALIGN_CENTER, defaultColor);
@@ -859,10 +857,8 @@ static void _DrawMessageBox(uiDrawObj_t *evt) {
 	int y1 = ((480/2) - (PROGRESS_BOX_HEIGHT/2));
 	int y2 = ((480/2) + (PROGRESS_BOX_HEIGHT/2));
 	
-  	GXColor fillColor = (GXColor) {0,0,0,GUI_MSGBOX_ALPHA}; //black
-	GXColor borderColor = (GXColor) {200,200,200,GUI_MSGBOX_ALPHA}; //silver
-	
-	_DrawSimpleBox( x1, y1, x2-x1, y2-y1, 0, fillColor, borderColor); 
+	sysBegin();
+	sysPanel(x1, y1, x2-x1, y2-y1);
 }	
 
 // External
@@ -895,19 +891,14 @@ static void _DrawSelectableButton(uiDrawObj_t *evt) {
 	drawSelectableButtonEvent_t *data = (drawSelectableButtonEvent_t*)evt->data;
 	int x1 = data->x1;
 	int x2 = data->x2;
-	GXColor selectColor = (GXColor) {96,107,164,GUI_MSGBOX_ALPHA}; //bluish
-	GXColor noColor = (GXColor) {0,0,0,0}; //black
-	GXColor borderColor = (GXColor) {200,200,200,GUI_MSGBOX_ALPHA}; //silver
-	
 	int borderSize = 4;
 	//determine length of the text ourselves if x2 == -1
 	x2 = (x2 == -1) ? GetTextSizeInPixels(data->msg)+x1+(borderSize*2)+6 : x2;
-	//Draw Text and backfill (if selected)
+	// Grey glass, kept 3 in from the edges so the gold ring fits around it without touching its neighbours
+	sysBegin();
+	sysButton(x1+3, data->y1+3, x2-x1-6, data->y2-data->y1+2-6, false);
 	if(data->mode==B_SELECTED) {
-		_DrawSimpleBox( x1, data->y1, x2-x1, data->y2-data->y1+2, 0, selectColor, borderColor);
-	}
-	else {
-		_DrawSimpleBox( x1, data->y1, x2-x1, data->y2-data->y1+2, 0, noColor, borderColor);
+		sysGoldRing(x1+3, data->y1+3, x2-x1-6, data->y2-data->y1+2-6, false);
 	}
 	
 	if(data->msg) {
@@ -949,8 +940,7 @@ static void _DrawTooltip(uiDrawObj_t *evt) {
 		//int alpha = data->tooltiptime*4 > 255 ? 255 : data->tooltiptime;
 		int alpha = 255;
 		int borderSize = 4;
-		GXColor borderColorTT = (GXColor) {255,255,255,alpha};
-		GXColor backColorTT = (GXColor) {122,122,122,alpha}; //grey
+		GXColor borderColorTT = (GXColor) {236,235,255,alpha};
 		int numLines = 1;
 		char *strPtr = data->tooltip;
 		for (numLines=1; strPtr[numLines]; strPtr[numLines]=='\n' ? numLines++ : *strPtr++);
@@ -958,7 +948,9 @@ static void _DrawTooltip(uiDrawObj_t *evt) {
 		int tooltipY1 = (getVideoMode()->efbHeight / 2) - (height/2);
 		// TODO centre on Y based on total size.
 		int tooltipX1 = 25, tooltipX2 = getVideoMode()->fbWidth-25, tooltipY2 = tooltipY1+height;
-		_DrawSimpleBox( tooltipX1, tooltipY1-6, tooltipX2-tooltipX1, (tooltipY2-tooltipY1)+6, 0, backColorTT, borderColorTT);
+		sysBegin();
+		sysPanel(tooltipX1-6, tooltipY1-12, tooltipX2-tooltipX1+12, (tooltipY2-tooltipY1)+18);
+		sysDescBar(tooltipX1, tooltipY1-6, tooltipX2-tooltipX1, (tooltipY2-tooltipY1)+6);
 		
 		// Write each line
 		strPtr = data->tooltip;
@@ -1003,7 +995,7 @@ static void _DrawStyledLabel(uiDrawObj_t *evt) {
 			data->caretColor.a += (data->fadingDirection * 20);
 			if(data->caretColor.a >= 255) { data->fadingDirection = -1; data->caretColor.a = 255; }
 			else if(data->caretColor.a <= 15) { data->fadingDirection = 1; data->caretColor.a = 0; }
-		}
+		}		
 		drawStringWithCaret(data->x, data->y, string, data->size, data->align, data->color, data->caretPosition, data->caretColor);
 	}
 	else {
@@ -1012,12 +1004,7 @@ static void _DrawStyledLabel(uiDrawObj_t *evt) {
 			if(data->color.a >= 255) data->fadingDirection = -1;
 			else if(data->color.a <= 15) data->fadingDirection = 1;
 		}
-		if(data->showEllipsis) {
-			drawStringEllipsis(data->x, data->y, string, data->size, data->align, data->color, false, data->maxSize);
-		}
-		else {
-			drawString(data->x, data->y, string, data->size, data->align, data->color);
-		}
+		drawString(data->x, data->y, string, data->size, data->align, data->color);
 	}
 }
 
@@ -1047,20 +1034,10 @@ uiDrawObj_t* DrawStyledLabelWithCaret(int x, int y, const char *string, float si
 {	
 	uiDrawObj_t *event = DrawStyledLabel(x, y, string, size, align, color);
 	drawStyledLabelEvent_t *eventData = (drawStyledLabelEvent_t*)event->data;
-	eventData->fadingDirection = 1;
-	eventData->showCaret = true;
 	eventData->caretPosition = caretPosition;
+	eventData->showCaret = true;
+	eventData->fadingDirection = 1;
 	eventData->caretColor = eventData->color;
-	return event;
-}
-
-// External
-uiDrawObj_t* DrawStyledLabelEllipsis(int x, int y, const char *string, float size, int align, GXColor color, int maxSize)
-{	
-	uiDrawObj_t *event = DrawStyledLabel(x, y, string, size, align, color);
-	drawStyledLabelEvent_t *eventData = (drawStyledLabelEvent_t*)event->data;
-	eventData->showEllipsis = true;
-	eventData->maxSize = maxSize;
 	return event;
 }
 
@@ -1137,59 +1114,49 @@ static void _DrawFileBrowserButton(uiDrawObj_t *evt) {
 	drawFileBrowserButtonEvent_t *data = (drawFileBrowserButtonEvent_t*)evt->data;
 	int borderSize = 4;	
 	if(data->isCarousel) {	
-		// Not selected
-		GXColor noColor 	= (GXColor) {0,0,0,128};
-		GXColor borderColor = (GXColor) {200,200,200,GUI_MSGBOX_ALPHA}; //Silver
 		// Large middle entry currently being displayed, verbose info
 		if(data->distFromMiddle == 0) {
 
-			_DrawSimpleBox(data->x1, data->y1, data->x2-data->x1, data->y2-data->y1, 0, noColor, borderColor);
+			sysBegin();
+			sysPanel(data->x1, data->y1, data->x2-data->x1, data->y2-data->y1);
+			drawInit();
 			
 			int x_mid = data->x2-((data->x2-data->x1)/2);
 			int bnr_width = 96;
 			int bnr_height = 32;
 			file_handle *file = data->file;
 			// Draw banner if there is one
-			if(file->meta) {
-				if(file->meta->banner || file->meta->fileTypeTexObj) {
-					GXTexObj *texObj = (file->meta->banner ? &file->meta->bannerTexObj : file->meta->fileTypeTexObj);
-					bnr_width *= (file->meta->banner ? 2 : 1);
-					bnr_height *= (file->meta->banner ? 2 : 1);
-					if(file->meta->banner) {
-						GX_SetNumTevStages(1);
-						GX_SetBlendMode(GX_BM_BLEND, GX_BL_SRCALPHA, GX_BL_INVSRCALPHA, GX_LO_CLEAR);
-					}
-					GX_InvalidateTexAll();
-					GXTlutObj *tlutObj = GX_GetTexObjUserData(texObj);
-					if(tlutObj) GX_LoadTlut(tlutObj, GX_GetTexObjTlut(texObj));
-					GX_LoadTexObj(texObj, GX_TEXMAP0);
-					int bnr_x = x_mid - (bnr_width/2);
-					GX_Begin(GX_QUADS, GX_VTXFMT0, 4);
-						GX_Position3f32((float) bnr_x,(float) data->y1+borderSize+40, 0.0f );
-						GX_Color4u8(255, 255, 255, data->alpha);
-						GX_TexCoord2f32(0.0f,0.0f);
-						GX_Position3f32((float) (bnr_x+bnr_width),(float) data->y1+borderSize+40,0.0f );
-						GX_Color4u8(255, 255, 255, data->alpha);
-						GX_TexCoord2f32(1.0f,0.0f);
-						GX_Position3f32((float) (bnr_x+bnr_width),(float) (data->y1+borderSize+40+bnr_height),0.0f );
-						GX_Color4u8(255, 255, 255, data->alpha);
-						GX_TexCoord2f32(1.0f,1.0f);
-						GX_Position3f32((float) bnr_x,(float) (data->y1+borderSize+40+bnr_height),0.0f );
-						GX_Color4u8(255, 255, 255, data->alpha);
-						GX_TexCoord2f32(0.0f,1.0f);
-					GX_End();
-					
-					if(data->isAutoLoadEntry) {
-						drawInit();
-						_DrawImageNow(TEX_STAR, bnr_x+bnr_width-16, data->y1+borderSize+40, 16, 16, 0, 0.0f, 1.0f, 0.0f, 1.0f, 0);
-					}
+			if(file->meta && (file->meta->banner || file->meta->fileTypeTexObj)) {
+				GXTexObj *texObj = (file->meta->banner ? &file->meta->bannerTexObj : file->meta->fileTypeTexObj);
+				bnr_width *= (file->meta->banner ? 2 : 1);
+				bnr_height *= (file->meta->banner ? 2 : 1);
+				if(file->meta->banner) {
+					GX_SetNumTevStages(1);
+					GX_SetBlendMode(GX_BM_BLEND, GX_BL_SRCALPHA, GX_BL_INVSRCALPHA, GX_LO_CLEAR);
 				}
+				GX_InvalidateTexAll();
+				GXTlutObj *tlutObj = GX_GetTexObjUserData(texObj);
+				if(tlutObj) GX_LoadTlut(tlutObj, GX_GetTexObjTlut(texObj));
+				GX_LoadTexObj(texObj, GX_TEXMAP0);
+				int bnr_x = x_mid - (bnr_width/2);
+				GX_Begin(GX_QUADS, GX_VTXFMT0, 4);
+					GX_Position3f32((float) bnr_x,(float) data->y1+borderSize+40, 0.0f );
+					GX_Color4u8(255, 255, 255, data->alpha);
+					GX_TexCoord2f32(0.0f,0.0f);
+					GX_Position3f32((float) (bnr_x+bnr_width),(float) data->y1+borderSize+40,0.0f );
+					GX_Color4u8(255, 255, 255, data->alpha);
+					GX_TexCoord2f32(1.0f,0.0f);
+					GX_Position3f32((float) (bnr_x+bnr_width),(float) (data->y1+borderSize+40+bnr_height),0.0f );
+					GX_Color4u8(255, 255, 255, data->alpha);
+					GX_TexCoord2f32(1.0f,1.0f);
+					GX_Position3f32((float) bnr_x,(float) (data->y1+borderSize+40+bnr_height),0.0f );
+					GX_Color4u8(255, 255, 255, data->alpha);
+					GX_TexCoord2f32(0.0f,1.0f);
+				GX_End();
 				
-				// Region
-				if(file->meta->regionTexObj) {
+				if(data->isAutoLoadEntry) {
 					drawInit();
-					_DrawTexObjNow(file->meta->regionTexObj, data->x2 - 44, data->y2-(borderSize+50), 32, 20, 0, 0.0f, 1.0f, 0.0f, 1.0f, 0);
-					drawString(data->x2 - 44, data->y2-(borderSize+41), "Region: ", 0.45f, ALIGN_RIGHT, defaultColor);
+					_DrawImageNow(TEX_STAR, bnr_x+bnr_width-16, data->y1+borderSize+40, 16, 16, 0, 0.0f, 1.0f, 0.0f, 1.0f, 0);
 				}
 				
 				// Company
@@ -1207,6 +1174,12 @@ static void _DrawFileBrowserButton(uiDrawObj_t *evt) {
 					drawString(x_mid, data->y1+(borderSize*2)+40+bnr_height+60+(line*scale*24), tok, scale, ALIGN_CENTER, defaultColor);
 					line++;
 				}
+			}
+			// Region
+			if(file->meta && file->meta->regionTexObj) {
+				drawString(data->x2 - 44, data->y2-(borderSize+41), "Region: ", 0.45f, ALIGN_RIGHT, defaultColor);
+				drawInit();
+				_DrawTexObjNow(file->meta->regionTexObj, data->x2 - 44, data->y2-(borderSize+50), 32, 20, 0, 0.0f, 1.0f, 0.0f, 1.0f, 0);
 			}
 			
 			// fullGameName displays some titles with incorrect encoding, use displayName instead
@@ -1232,13 +1205,15 @@ static void _DrawFileBrowserButton(uiDrawObj_t *evt) {
 			}
 		}
 		else {
-			// Vertical
-			_DrawSimpleBox(data->x1, data->y1, data->x2-data->x1, data->y2-data->y1, 0, noColor, borderColor);
+			// Vertical: the spines either side are frosted glass
+			sysBegin();
+			sysFrostRow(data->x1+2, data->y1, data->x2-data->x1-4, data->y2-data->y1, 255);
+			drawInit();
 			int bnr_width = 72;
 			int bnr_height = 24;
 			int x_start = (data->x2-((data->x2-data->x1)/2)) - (bnr_height/2);
-			file_handle *file = data->file;
 			// Draw banner if there is one
+			file_handle *file = data->file;
 			if(file->meta && (file->meta->banner || file->meta->fileTypeTexObj)) {
 				GXTexObj *texObj = (file->meta->banner ? &file->meta->bannerTexObj : file->meta->fileTypeTexObj);
 				if(file->meta->banner) {
@@ -1278,56 +1253,52 @@ static void _DrawFileBrowserButton(uiDrawObj_t *evt) {
 	}
 	else {
 		
-		// Not selected
-		GXColor noColor 	= (GXColor) {0,0,0,0};
-		GXColor selectColor = (GXColor) {46,57,104,GUI_MSGBOX_ALPHA}; 	//bluish
-		GXColor borderColor = (GXColor) {200,200,200,GUI_MSGBOX_ALPHA}; //Silver
-
-		_DrawSimpleBox(data->x1, data->y1, data->x2-data->x1, data->y2-data->y1, 
-					0, data->mode == B_SELECTED ? selectColor : noColor, borderColor);
+		// A frosted row, 3 in from the edges; the selected one gets the gold ring in that space
+		sysBegin();
+		sysFrostRow(data->x1+3, data->y1+3, data->x2-data->x1-6, data->y2-data->y1-6, 255);
+		if(data->mode == B_SELECTED) {
+			sysGoldRing(data->x1+3, data->y1+3, data->x2-data->x1-6, data->y2-data->y1-6, false);
+		}
+		drawInit();
 		
-		file_handle *file = data->file;
 		// Draw banner if there is one
-		if(file->meta) {
-			if(file->meta->banner || file->meta->fileTypeTexObj) {
-				GXTexObj *texObj = (file->meta->banner ? &file->meta->bannerTexObj : file->meta->fileTypeTexObj);
-				if(file->meta->banner) {
-					GX_SetTevOrder(GX_TEVSTAGE1, GX_TEXCOORD0, GX_TEXMAP1, GX_COLOR0A0);
-					GX_SetTevColorIn(GX_TEVSTAGE1, GX_CC_ZERO, GX_CC_ZERO, GX_CC_ZERO, GX_CC_CPREV);
-					GX_SetTevAlphaIn(GX_TEVSTAGE1, GX_CA_ZERO, GX_CA_APREV, GX_CA_TEXA, GX_CA_ZERO);
-					GX_SetBlendMode(GX_BM_BLEND, GX_BL_SRCALPHA, GX_BL_INVSRCALPHA, GX_LO_CLEAR);
-				}
-				GX_InvalidateTexAll();
-				GXTlutObj *tlutObj = GX_GetTexObjUserData(texObj);
-				if(tlutObj) GX_LoadTlut(tlutObj, GX_GetTexObjTlut(texObj));
-				GX_LoadTexObj(texObj, GX_TEXMAP0);
-				GX_LoadTexObj(&bannerMaskTexObj, GX_TEXMAP1);
-				GX_Begin(GX_QUADS, GX_VTXFMT0, 4);
-					GX_Position3f32((float) data->x1+7,(float) data->y1+4, 0.0f );
-					GX_Color4u8(255, 255, 255, data->alpha);
-					GX_TexCoord2f32(0.0f,0.0f);
-					GX_Position3f32((float) (data->x1+7+96),(float) data->y1+4,0.0f );
-					GX_Color4u8(255, 255, 255, data->alpha);
-					GX_TexCoord2f32(1.0f,0.0f);
-					GX_Position3f32((float) (data->x1+7+96),(float) (data->y1+4+32),0.0f );
-					GX_Color4u8(255, 255, 255, data->alpha);
-					GX_TexCoord2f32(1.0f,1.0f);
-					GX_Position3f32((float) data->x1+7,(float) (data->y1+4+32),0.0f );
-					GX_Color4u8(255, 255, 255, data->alpha);
-					GX_TexCoord2f32(0.0f,1.0f);
-				GX_End();
-				
-				if(data->isAutoLoadEntry) {
-					drawInit();
-					_DrawImageNow(TEX_STAR, data->x1+7+96-16, data->y1+4, 16, 16, 0, 0.0f, 1.0f, 0.0f, 1.0f, 0);
-				}
+		file_handle *file = data->file;
+		if(file->meta && (file->meta->banner || file->meta->fileTypeTexObj)) {
+			GXTexObj *texObj = (file->meta->banner ? &file->meta->bannerTexObj : file->meta->fileTypeTexObj);
+			if(file->meta->banner) {
+				GX_SetTevOrder(GX_TEVSTAGE1, GX_TEXCOORD0, GX_TEXMAP1, GX_COLOR0A0);
+				GX_SetTevColorIn(GX_TEVSTAGE1, GX_CC_ZERO, GX_CC_ZERO, GX_CC_ZERO, GX_CC_CPREV);
+				GX_SetTevAlphaIn(GX_TEVSTAGE1, GX_CA_ZERO, GX_CA_APREV, GX_CA_TEXA, GX_CA_ZERO);
+				GX_SetBlendMode(GX_BM_BLEND, GX_BL_SRCALPHA, GX_BL_INVSRCALPHA, GX_LO_CLEAR);
 			}
-			if(file->meta->regionTexObj) {
+			GX_InvalidateTexAll();
+			GXTlutObj *tlutObj = GX_GetTexObjUserData(texObj);
+			if(tlutObj) GX_LoadTlut(tlutObj, GX_GetTexObjTlut(texObj));
+			GX_LoadTexObj(texObj, GX_TEXMAP0);
+			GX_LoadTexObj(&bannerMaskTexObj, GX_TEXMAP1);
+			GX_Begin(GX_QUADS, GX_VTXFMT0, 4);
+				GX_Position3f32((float) data->x1+7,(float) data->y1+4, 0.0f );
+				GX_Color4u8(255, 255, 255, data->alpha);
+				GX_TexCoord2f32(0.0f,0.0f);
+				GX_Position3f32((float) (data->x1+7+96),(float) data->y1+4,0.0f );
+				GX_Color4u8(255, 255, 255, data->alpha);
+				GX_TexCoord2f32(1.0f,0.0f);
+				GX_Position3f32((float) (data->x1+7+96),(float) (data->y1+4+32),0.0f );
+				GX_Color4u8(255, 255, 255, data->alpha);
+				GX_TexCoord2f32(1.0f,1.0f);
+				GX_Position3f32((float) data->x1+7,(float) (data->y1+4+32),0.0f );
+				GX_Color4u8(255, 255, 255, data->alpha);
+				GX_TexCoord2f32(0.0f,1.0f);
+			GX_End();
+			
+			if(data->isAutoLoadEntry) {
 				drawInit();
-				_DrawTexObjNow(file->meta->regionTexObj, data->x2 - 39, data->y1+borderSize+1, 32, 20, 0, 0.0f, 1.0f, 0.0f, 1.0f, 0);
-			} else {
-				drawString(data->x2-(borderSize+3), data->y1+borderSize+10, file->meta->osType, 0.6f, ALIGN_RIGHT, defaultColor);
+				_DrawImageNow(TEX_STAR, data->x1+7+96-16, data->y1+4, 16, 16, 0, 0.0f, 1.0f, 0.0f, 1.0f, 0);
 			}
+		}
+		if(file->meta && file->meta->regionTexObj) {
+			drawInit();
+			_DrawTexObjNow(file->meta->regionTexObj, data->x2 - 39, data->y1+borderSize+1, 32, 20, 0, 0.0f, 1.0f, 0.0f, 1.0f, 0);
 		}
 
 		// fullGameName displays some titles with incorrect encoding, use displayName instead
@@ -1456,10 +1427,19 @@ uiDrawObj_t* DrawFileCarouselEntry(int x1, int y1, int x2, int y2, const char *m
 // Internal
 static void _DrawEmptyBox(uiDrawObj_t *evt) {
 	drawBoxEvent_t *data = (drawBoxEvent_t*)evt->data;
+	int w = data->x2-data->x1, h = data->y2-data->y1;
 	
-	GXColor borderColor = (GXColor) {200,200,200,GUI_MSGBOX_ALPHA}; //Silver
-	
-	_DrawSimpleBox(data->x1, data->y1, data->x2-data->x1, data->y2-data->y1, 0, data->backfill, borderColor);
+	sysBegin();
+	if(h <= 40) {
+		// Small boxes are keys (the on-screen keyboard): grey glass, gold ring on the chosen one
+		sysButton(data->x1, data->y1, w, h, false);
+		if(data->backfill.r == 96 && data->backfill.g == 107 && data->backfill.b == 164) {
+			sysGoldRing(data->x1, data->y1, w, h, false);
+		}
+	}
+	else {
+		sysPanel(data->x1, data->y1, w, h);
+	}
 }
 
 // External
@@ -1503,10 +1483,13 @@ uiDrawObj_t* DrawEmptyColouredBox(int x1, int y1, int x2, int y2, GXColor colour
 // Internal
 static void _DrawTransparentBox(uiDrawObj_t *evt) {
 	drawBoxEvent_t *data = (drawBoxEvent_t*)evt->data;
+	int w = data->x2-data->x1, h = data->y2-data->y1;
 	
-	GXColor borderColor = (GXColor) {200,200,200,GUI_MSGBOX_ALPHA}; //Silver
-	
-	_DrawSimpleBox( data->x1, data->y1, data->x2-data->x1, data->y2-data->y1, 0, data->backfill, borderColor);
+	sysBegin();
+	sysFrostRow(data->x1, data->y1, w, h, 255);
+	if(data->highlight) {
+		sysGoldRing(data->x1, data->y1, w, h, false);
+	}
 }
 
 // External
@@ -1528,13 +1511,20 @@ uiDrawObj_t* DrawTransparentBox(int x1, int y1, int x2, int y2)
 	return event;
 }
 
+// External (the selected entry in a list: frosted, with the gold ring)
+uiDrawObj_t* DrawHighlightBox(int x1, int y1, int x2, int y2)
+{
+	uiDrawObj_t *event = DrawTransparentBox(x1, y1, x2, y2);
+	((drawBoxEvent_t*)event->data)->highlight = true;
+	return event;
+}
+
 // Internal
 static void _DrawTitleBar(uiDrawObj_t *evt) {
 	
-	GXColor fillColor = (GXColor) {0,0,0,128}; //black
-	GXColor noColor = (GXColor) {0,0,0,0}; //blank
-	
-	_DrawSimpleBox(19, 17, 602, 62, 0, fillColor, noColor);
+	sysBegin();
+	sysPanel(19, 17, 602, 62);
+	drawInit();
 	
 	_DrawImageNow(TEX_SWISS, 36, 32, 96, 32, 0, 0.0f, 1.0f, 0.0f, 1.0f, 0);
 	drawString(142, 39, "for GameCube", 0.55f, ALIGN_LEFT, defaultColor);
@@ -1567,27 +1557,35 @@ uiDrawObj_t* DrawTitleBar()
 static void _DrawMenuButtons(uiDrawObj_t *evt) {
 	
 	drawMenuButtonsEvent_t *data = (drawMenuButtonsEvent_t*)evt->data;
-	
-	GXColor fillColor = (GXColor) {255,255,255,51}; //white
-	GXColor noColor = (GXColor) {0,0,0,0}; //blank
-	
-	_DrawSimpleBox(19, 426, 602, 602, 0, fillColor, noColor);
-	
-	// Highlight selected
+	static const char *labels[MENU_MAX] = {"Device", "Settings", "Info", "Refresh", "Exit"};
+	static const int icons[MENU_MAX] = {TEX_BTNDEVICE, TEX_BTNSETTINGS, TEX_BTNINFO, TEX_BTNREFRESH, TEX_BTNEXIT};
+	static const int iconW[MENU_MAX] = {BTNDEVICE_WIDTH, BTNSETTINGS_WIDTH, BTNINFO_WIDTH, BTNREFRESH_WIDTH, BTNEXIT_WIDTH};
+	static const int iconH[MENU_MAX] = {BTNDEVICE_HEIGHT, BTNSETTINGS_HEIGHT, BTNINFO_HEIGHT, BTNREFRESH_HEIGHT, BTNEXIT_HEIGHT};
+	const int bw = 100, bh = 30, by = 437;
 	int i;
-	for(i=0;i<5;i++)
-	{
-		if(data->selection==i) 
-			_DrawImageNow(TEX_BTNHILIGHT, 48+(i*119), 428, BTNHILIGHT_WIDTH, BTNHILIGHT_HEIGHT, 0, 0.0f, 1.0f, 0.0f, 1.0f, 0);
+	
+	// A panel along the bottom with five glass buttons; the gold ring marks the chosen one
+	sysBegin();
+	sysPanel(19, 431, 602, 42);
+	for(i=0;i<MENU_MAX;i++) {
+		int bx = 32+(i*119);
+		sysButton(bx, by, bw, bh, false);
+		if(data->selection==i)
+			sysGoldRing(bx, by, bw, bh, true);
 	}
-
-	// Draw the buttons	
+	
+	// Swiss's own icons, then the names
 	drawInit();
-	_DrawImageNow(TEX_BTNDEVICE, 48+(0*119)+BTNDEVICE_X, 428+BTNDEVICE_Y, BTNDEVICE_WIDTH, BTNDEVICE_HEIGHT, 0, 0.0f, 1.0f, 0.0f, 1.0f, 0);
-	_DrawImageNow(TEX_BTNSETTINGS, 48+(1*119)+BTNSETTINGS_X, 428+BTNSETTINGS_Y, BTNSETTINGS_WIDTH, BTNSETTINGS_HEIGHT, 0, 0.0f, 1.0f, 0.0f, 1.0f, 0);
-	_DrawImageNow(TEX_BTNINFO, 48+(2*119)+BTNINFO_X, 428+BTNINFO_Y, BTNINFO_WIDTH, BTNINFO_HEIGHT, 0, 0.0f, 1.0f, 0.0f, 1.0f, 0);
-	_DrawImageNow(TEX_BTNREFRESH, 48+(3*119)+BTNREFRESH_X, 428+BTNREFRESH_Y, BTNREFRESH_WIDTH, BTNREFRESH_HEIGHT, 0, 0.0f, 1.0f, 0.0f, 1.0f, 0);
-	_DrawImageNow(TEX_BTNEXIT, 48+(4*119)+BTNEXIT_X, 428+BTNEXIT_Y, BTNEXIT_WIDTH, BTNEXIT_HEIGHT, 0, 0.0f, 1.0f, 0.0f, 1.0f, 0);
+	for(i=0;i<MENU_MAX;i++) {
+		int bx = 32+(i*119);
+		float k = 22.0f / MAX(iconW[i], iconH[i]);
+		int w = (int)(iconW[i]*k), h = (int)(iconH[i]*k);
+		_DrawImageNow(icons[i], bx+22-(w/2), by+(bh/2)-(h/2), w, h, 0, 0.0f, 1.0f, 0.0f, 1.0f, 0);
+		drawInit();
+	}
+	for(i=0;i<MENU_MAX;i++) {
+		drawString(32+(i*119)+38, by+(bh/2), labels[i], 0.55f, ALIGN_LEFT, defaultColor);
+	}
 }
 
 // External
@@ -1631,6 +1629,45 @@ void DrawUpdateFileBrowserButton(uiDrawObj_t *evt, int mode) {
 }
 
 // Internal
+static void _DrawSettingRow(uiDrawObj_t *evt) {
+	drawSettingRowEvent_t *data = (drawSettingRowEvent_t*)evt->data;
+	int w = data->x2-data->x1, h = data->y2-data->y1;
+	sysBegin();
+	if(data->stripe) {
+		sysRect(data->x1+3, data->y1+3, w-6, h-6, (GXColor) {255,255,255,12});
+	}
+	if(data->selected) {
+		// a little light behind the chosen row, the gold ring in the 3 units around it
+		sysRectV(data->x1+3, data->y1+3, w-6, h-6, (GXColor) {140,160,180,60}, (GXColor) {70,90,110,40});
+		sysGoldRing(data->x1+3, data->y1+3, w-6, h-6, false);
+	}
+	if(data->arrowLeftX && data->arrowRightX) {
+		// the value can be changed with left and right
+		float cy = (data->y1+data->y2)/2.0f;
+		GXColor c = (GXColor) {201,210,238,255};
+		sysTriangle(data->arrowLeftX, cy, data->arrowLeftX+6, cy-5, data->arrowLeftX+6, cy+5, c);
+		sysTriangle(data->arrowRightX, cy, data->arrowRightX-6, cy-5, data->arrowRightX-6, cy+5, c);
+	}
+}
+
+// External (one line of a settings page)
+uiDrawObj_t* DrawSettingRow(int x1, int y1, int x2, int y2, bool selected, bool stripe, int arrowLeftX, int arrowRightX) {
+	drawSettingRowEvent_t *eventData = calloc(1, sizeof(drawSettingRowEvent_t));
+	eventData->x1 = x1;
+	eventData->y1 = y1;
+	eventData->x2 = x2;
+	eventData->y2 = y2;
+	eventData->selected = selected;
+	eventData->stripe = stripe;
+	eventData->arrowLeftX = arrowLeftX;
+	eventData->arrowRightX = arrowRightX;
+	uiDrawObj_t *event = calloc(1, sizeof(uiDrawObj_t));
+	event->type = EV_SETTINGROW;
+	event->data = eventData;
+	return event;
+}
+
+// Internal
 static void _DrawVertScrollBar(uiDrawObj_t *evt) {
 	drawVertScrollbarEvent_t *data = (drawVertScrollbarEvent_t*)evt->data;
 	int x1 = data->x;
@@ -1642,14 +1679,11 @@ static void _DrawVertScrollBar(uiDrawObj_t *evt) {
 	if(scrollStartY > y2-3-data->scrollHeight)
 		scrollStartY = y2-3-data->scrollHeight;
 	
-	GXColor fillColor = (GXColor) {46,57,104,GUI_MSGBOX_ALPHA}; 	//bluish
-  	GXColor noColor = (GXColor) {0,0,0,0}; //blank
-	GXColor borderColor = (GXColor) {200,200,200,GUI_MSGBOX_ALPHA}; //silver
-	
-	_DrawSimpleBox( x1, y1, x2-x1, y2-y1, 0, noColor, borderColor);
-	
-	_DrawSimpleBox( x1, scrollStartY,
-			data->width, data->scrollHeight, 0, fillColor, borderColor); 
+	// A narrow groove with a gold thumb, centred where the old bar was
+	int gw = 6, gx = (x1+x2)/2 - gw/2;
+	sysBegin();
+	sysTrack(gx, y1+3, gw, (y2-y1)-6);
+	sysGoldFill(gx, scrollStartY, gw, data->scrollHeight);
 }
 
 // External
@@ -1680,7 +1714,7 @@ static uiDrawObj_t* drawParameterForArgsSelector(Parameter *param, int x, int y,
 	GXColor fontColor = (param->enable || selected) ? defaultColor : deSelectedColor;
 
 	// If selected draw that it's selected
-	if(selected) DrawAddChild(container, DrawTransparentBox( x+chkWidth+gapWidth, y, getVideoMode()->fbWidth-52, y+30));
+	if(selected) DrawAddChild(container, DrawHighlightBox( x+chkWidth+gapWidth, y, getVideoMode()->fbWidth-52, y+30));
 	DrawAddChild(container, DrawImage(param->enable ? TEX_CHECKED:TEX_UNCHECKED, x, y, 32, 32, 0, 0.0f, 1.0f, 0.0f, 1.0f, 0));
 	// Draw the parameter Name
 	DrawAddChild(container, DrawStyledLabel(x+chkWidth+gapWidth+5, y+15, name, GetTextScaleToFitInWidth(name, nameWidth-10), ALIGN_LEFT, fontColor));
@@ -1768,7 +1802,7 @@ static uiDrawObj_t* drawCheatForCheatsSelector(CheatEntry *cheat, int x, int y, 
 
 	// If selected draw that it's selected
 	DrawAddChild(container, DrawImage(cheat->enabled ? TEX_CHECKED:TEX_UNCHECKED, x, y, 32, 32, 0, 0.0f, 1.0f, 0.0f, 1.0f, 0));
-	if(selected) DrawAddChild(container, DrawTransparentBox( x+chkWidth+gapWidth, y, getVideoMode()->fbWidth-52, y+30));
+	if(selected) DrawAddChild(container, DrawHighlightBox( x+chkWidth+gapWidth, y, getVideoMode()->fbWidth-52, y+30));
 	// Draw the cheat Name
 	DrawAddChild(container, DrawStyledLabel(x+chkWidth+gapWidth+5, y+15, name, GetTextScaleToFitInWidth(name, nameWidth-10), ALIGN_LEFT, fontColor));
 	return container;
@@ -2166,6 +2200,9 @@ static void videoDrawEvent(uiDrawObj_t *videoEvent) {
 		case EV_TITLEBAR:
 			_DrawTitleBar(videoEvent);
 			break;
+		case EV_SETTINGROW:
+			_DrawSettingRow(videoEvent);
+			break;
 		default:
 			break;
 	}
@@ -2364,6 +2401,7 @@ void DrawLoadBackdrop(DEVICEHANDLER_INTERFACE *device) {
 					break;
 			}
 			GX_InitTexObjUserData(&backdropIndTexObj, NULL);
+			customBackdrop = true;
 		}
 		else {
 			TPL_CloseTPLFile(&backdropTPL);

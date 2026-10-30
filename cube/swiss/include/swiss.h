@@ -1,3 +1,4 @@
+/* Changed 2026-10-29 (fork): screen shape settings for Swiss's own screens. */
 /* swiss.h 
 	- defines and externs
  */
@@ -72,8 +73,6 @@ extern u32 __SYS_UnlockSramEx(u32 write);
 extern u32 __SYS_SyncSram(void);
 extern u32 __SYS_CheckSram(void);
 extern void __SYS_ReadROM(void *buf,u32 len,u32 offset);
-extern u32 __SYS_SetRTC(u32 gctime);
-extern void __SYS_InitTime(void);
 extern u8 __SYS_SetTAUCalibration(s8 calib);
 
 extern uiDrawObj_t* renderFileBrowser(file_handle** directory, int num_files, uiDrawObj_t* filePanel);
@@ -94,7 +93,6 @@ extern void select_speed();
 extern int select_slot();
 extern void select_device(int type);
 extern bool select_dest_dir(file_handle* initial, char* selection);
-extern void select_timezone(char* selection);
 
 typedef struct {
 	int cubebootInvoked;
@@ -107,7 +105,6 @@ typedef struct {
 	int hasFlippyDrive;
 	int exiSpeed;
 	int uiVMode;	// What mode to force Swiss into
-	int appsVMode;
 	int gameVMode;	// What mode to force a Game into
 	int gameVModeNtsc;
 	int gameVModePal;
@@ -153,8 +150,6 @@ typedef struct {
 	s8 sramTemperature;
 	u8 sramLanguage;
 	u8 sramVideo;
-	char timeZone[32];
-	char sntpHostIp[16];
 	char rt4kHostIp[16];
 	u16 rt4kPort;
 	bool rt4kOptim;
@@ -193,6 +188,9 @@ typedef struct {
 	char autoload[PATHNAME_MAX];
 	char flattenDir[PATHNAME_MAX];
 	char recent[RECENT_MAX][PATHNAME_MAX];
+	int uiWidescreen;	// Swiss's own screens: 0 = 4:3, 1 = 16:9
+	int uiPictureWidth;	// 0 = Full (704), 1 = Standard (640)
+	int uiOverscan;		// percent the screens are pulled in from the edges
 } SwissSettings;
 extern SwissSettings swissSettings;
 

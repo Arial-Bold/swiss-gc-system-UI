@@ -1,3 +1,4 @@
+/* Changed 2026-10-29 (fork): text follows the screen shape; lighter grey for dimmed text. */
 /* -----------------------------------------------------------
       IPLFontWrite.c - Font blitter for IPL ROM fonts
 	      - by emu_kidid
@@ -13,6 +14,7 @@
 #include <ogcsys.h>
 #include <string.h>
 #include "IPLFontWrite.h"
+#include "SystemLook.h"
 
 static u8 fontData[SYS_FONTSIZE_ANSI] ATTRIBUTE_ALIGN (32);
 static sys_fontheader *font = (sys_fontheader *)fontData;
@@ -20,7 +22,7 @@ static sys_fontheader *font = (sys_fontheader *)fontData;
 GXTexObj fontTexObj;
 GXColor defaultColor = (GXColor) {255,255,255,255};
 GXColor disabledColor = (GXColor) {175,175,182,255};
-GXColor deSelectedColor = (GXColor) {80,80,73,255};
+GXColor deSelectedColor = (GXColor) {124,134,146,255};	// cool grey, readable on the System panels
 
 void init_font(void)
 {
@@ -33,7 +35,6 @@ void init_font(void)
 
 void drawFontInit(void)
 {
-	Mtx44 GXprojection2D;
 	Mtx GXmodelView2D;
 
 	// Reset various parameters from gfx plugin
@@ -44,8 +45,7 @@ void drawFontInit(void)
 	guMtxIdentity(GXmodelView2D);
 	GX_LoadTexMtxImm(GXmodelView2D,GX_TEXMTX0,GX_MTX2x4);
 	GX_LoadPosMtxImm(GXmodelView2D,GX_PNMTX0);
-	guOrtho(GXprojection2D, 0, 480, 0, 640, 0, 1);
-	GX_LoadProjectionMtx(GXprojection2D, GX_ORTHOGRAPHIC);
+	sysLoadProjection();	// same screen shape as the rest of the drawing
 
 	GX_SetZMode(GX_DISABLE,GX_ALWAYS,GX_FALSE);
 
