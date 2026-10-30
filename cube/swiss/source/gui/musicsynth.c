@@ -1,17 +1,19 @@
 /* musicsynth.c - see musicsynth.h.
  *
- * The piece is CubeVerse's own: a light, mellow tune in F major at 98
- * beats a minute, in the spirit of a cheerful menu theme. Two bars of intro,
- * then A (eight bars), A again with the whistle, B (eight bars, a gentler
- * middle) and A once more, about 80 seconds; then it goes round again from
- * the first A. The sounds:
- *  - a round, warm bass that steps between root, octave and fifth;
- *  - an electric piano playing the chords on the off-beats;
- *  - a marimba with the tune (and, under the whistle, little arpeggios);
- *  - a soft whistle;
- *  - a quiet shaker, a soft snap and a gentle kick;
+ * The piece is Swiss's own (the System look's menu music): an easy bossa
+ * nova in D major at 88 beats a minute, warm and unhurried, for browsing
+ * a long list of files. Two bars of intro, then A (eight bars, the tune on
+ * the marimba), A again (on the whistle, with little marimba arpeggios),
+ * B (eight bars, a dreamier middle that drifts to G minor and back) and
+ * A once more (marimba and whistle together), about 90 seconds; then it
+ * goes round again from the first A. The sounds:
+ *  - a round, warm bass in the bossa pattern: root, then the fifth;
+ *  - an electric piano comping in the bossa rhythm;
+ *  - a marimba and a soft whistle with the tune;
+ *  - a quiet shaker on the eighths, a rim click on the clave, a gentle kick;
  *  - a small room and a little echo.
- * Nothing is sampled; every sound is made here, sample by sample. */
+ * Nothing is sampled; every sound is made here, sample by sample. (The
+ * synthesiser is CubeVerse's; the piece is new.) */
 #include "musicsynth.h"
 #include <math.h>
 #include <string.h>
@@ -23,55 +25,53 @@
 /* ------------------------------------------------------------- the score */
 
 /* chords: a root for the bass and four notes for the piano */
-enum { FMA7, GM7, C7, AM7, DM7, BBMA7, D7, C9, C_BB, A7, G7, C7SUS, NCH };
+enum { DMA9, BM9, EM9, A13, FSM9, B7B9, A9SUS, GMA9, GM69, B13, NCH };
 static const struct { signed char root; signed char ep[4]; } chords[NCH] = {
-    [FMA7] = { 41, { 57, 60, 64, 67 } },    /* F major 9 (A C E G) */
-    [GM7] = { 43, { 58, 62, 65, 69 } },     /* G minor 9 */
-    [C7] = { 36, { 58, 62, 64, 69 } },      /* C 13 */
-    [AM7] = { 45, { 55, 60, 64, 67 } },     /* A minor 7 */
-    [DM7] = { 38, { 57, 60, 62, 65 } },     /* D minor 7 */
-    [BBMA7] = { 46, { 57, 60, 62, 65 } },   /* B flat major 9 */
-    [D7] = { 38, { 54, 60, 64, 66 } },      /* D 9 */
-    [C9] = { 36, { 58, 62, 64, 67 } },      /* C 9 */
-    [C_BB] = { 46, { 55, 60, 64, 67 } },    /* C over B flat */
-    [A7] = { 45, { 55, 61, 64, 67 } },      /* A 7 */
-    [G7] = { 43, { 53, 57, 59, 64 } },      /* G 13 */
-    [C7SUS] = { 36, { 58, 60, 65, 67 } },   /* C 7 sus */
+    [DMA9] = { 38, { 57, 61, 64, 66 } },    /* D major 9 (A C# E F#) */
+    [BM9] = { 47, { 57, 61, 62, 66 } },     /* B minor 9 */
+    [EM9] = { 40, { 55, 59, 62, 66 } },     /* E minor 9 */
+    [A13] = { 45, { 55, 59, 61, 66 } },     /* A 13 */
+    [FSM9] = { 42, { 57, 61, 64, 68 } },    /* F sharp minor 9 */
+    [B7B9] = { 47, { 57, 60, 63, 66 } },    /* B 7 flat 9 */
+    [A9SUS] = { 45, { 55, 59, 62, 64 } },   /* A 9 sus */
+    [GMA9] = { 43, { 57, 59, 62, 66 } },    /* G major 9 */
+    [GM69] = { 43, { 58, 62, 64, 69 } },    /* G minor 6/9 */
+    [B13] = { 47, { 57, 63, 66, 68 } },     /* B 13 */
 };
 
 /* a bar: the chord for its first half and its second half */
 typedef struct { unsigned char c1, c2; } Bar;
 static const Bar bars_a[8] = {
-    { FMA7, FMA7 }, { GM7, C7 }, { AM7, DM7 }, { GM7, C7 },
-    { FMA7, FMA7 }, { BBMA7, BBMA7 }, { AM7, D7 }, { GM7, C9 },
+    { DMA9, DMA9 }, { BM9, BM9 }, { EM9, EM9 }, { A13, A13 },
+    { FSM9, FSM9 }, { B7B9, B7B9 }, { EM9, EM9 }, { A9SUS, A13 },
 };
 static const Bar bars_b[8] = {
-    { BBMA7, BBMA7 }, { C_BB, C_BB }, { AM7, AM7 }, { DM7, DM7 },
-    { GM7, GM7 }, { A7, A7 }, { DM7, G7 }, { GM7, C7SUS },
+    { GMA9, GMA9 }, { GM69, GM69 }, { FSM9, FSM9 }, { B13, B7B9 },
+    { EM9, EM9 }, { A13, A13 }, { DMA9, DMA9 }, { A9SUS, A13 },
 };
 
 /* the tunes: per bar, notes of { sixteenth, MIDI note, length in sixteenths } */
 typedef struct { signed char at, note, len; } Note;
 #define END { -1, 0, 0 }
-static const Note tune_a[8][9] = {
-    { { 2, 69, 2 }, { 4, 72, 2 }, { 6, 76, 3 }, { 10, 74, 2 }, { 12, 72, 4 }, END },
-    { { 0, 70, 2 }, { 2, 74, 2 }, { 4, 77, 4 }, { 10, 76, 2 }, { 12, 74, 2 }, { 14, 72, 2 }, END },
-    { { 0, 72, 3 }, { 3, 69, 3 }, { 6, 67, 2 }, { 8, 69, 2 }, { 10, 72, 2 }, { 12, 77, 4 }, END },
-    { { 0, 76, 6 }, { 6, 74, 2 }, { 8, 72, 2 }, { 10, 70, 2 }, { 12, 67, 4 }, END },
-    { { 2, 69, 2 }, { 4, 72, 2 }, { 6, 76, 2 }, { 8, 79, 4 }, { 12, 76, 2 }, { 14, 72, 2 }, END },
-    { { 0, 74, 3 }, { 3, 77, 3 }, { 6, 74, 2 }, { 8, 72, 2 }, { 10, 70, 2 }, { 12, 69, 4 }, END },
-    { { 0, 72, 2 }, { 2, 76, 2 }, { 4, 79, 4 }, { 8, 78, 2 }, { 10, 76, 2 }, { 12, 74, 4 }, END },
-    { { 0, 70, 3 }, { 3, 72, 3 }, { 6, 74, 2 }, { 8, 76, 2 }, { 10, 79, 2 }, { 12, 77, 4 }, END },
+static const Note tune_a[8][7] = {
+    { { 0, 78, 3 }, { 3, 76, 3 }, { 6, 73, 2 }, { 8, 74, 6 }, { 14, 76, 2 }, END },
+    { { 0, 78, 4 }, { 4, 81, 2 }, { 6, 78, 2 }, { 8, 76, 8 }, END },
+    { { 2, 74, 2 }, { 4, 76, 2 }, { 6, 78, 3 }, { 9, 79, 3 }, { 12, 81, 4 }, END },
+    { { 0, 78, 6 }, { 6, 76, 2 }, { 8, 73, 4 }, { 12, 71, 2 }, { 14, 73, 2 }, END },
+    { { 0, 73, 3 }, { 3, 76, 3 }, { 6, 81, 2 }, { 8, 80, 4 }, { 12, 76, 4 }, END },
+    { { 0, 75, 3 }, { 3, 78, 3 }, { 6, 81, 3 }, { 9, 79, 3 }, { 12, 78, 4 }, END },
+    { { 0, 79, 2 }, { 2, 78, 2 }, { 4, 76, 4 }, { 8, 74, 2 }, { 10, 76, 2 }, { 12, 78, 4 }, END },
+    { { 0, 76, 6 }, { 6, 74, 2 }, { 8, 73, 8 }, END },
 };
 static const Note tune_b[8][6] = {
-    { { 0, 74, 6 }, { 6, 77, 2 }, { 8, 81, 8 }, END },
-    { { 0, 79, 6 }, { 6, 76, 2 }, { 8, 72, 8 }, END },
-    { { 0, 76, 4 }, { 4, 79, 4 }, { 8, 81, 4 }, { 12, 79, 4 }, END },
-    { { 0, 77, 10 }, { 10, 74, 2 }, { 12, 77, 4 }, END },
-    { { 0, 74, 4 }, { 4, 77, 4 }, { 8, 82, 4 }, { 12, 81, 4 }, END },
-    { { 0, 79, 4 }, { 4, 76, 4 }, { 8, 73, 4 }, { 12, 76, 4 }, END },
-    { { 0, 77, 6 }, { 6, 74, 2 }, { 8, 71, 4 }, { 12, 74, 4 }, END },
-    { { 0, 72, 8 }, { 12, 69, 2 }, { 14, 70, 2 }, END },
+    { { 0, 78, 6 }, { 6, 79, 2 }, { 8, 81, 8 }, END },
+    { { 0, 82, 6 }, { 6, 81, 2 }, { 8, 76, 8 }, END },
+    { { 0, 81, 6 }, { 6, 78, 2 }, { 8, 76, 8 }, END },
+    { { 0, 75, 4 }, { 4, 78, 4 }, { 8, 81, 4 }, { 12, 84, 4 }, END },
+    { { 0, 83, 6 }, { 6, 81, 2 }, { 8, 78, 8 }, END },
+    { { 0, 79, 4 }, { 4, 78, 4 }, { 8, 76, 4 }, { 12, 73, 4 }, END },
+    { { 0, 74, 6 }, { 6, 76, 2 }, { 8, 78, 8 }, END },
+    { { 0, 76, 8 }, { 12, 76, 2 }, { 14, 73, 2 }, END },
 };
 
 /* the order: 2 intro bars, A, A (whistle), B, A (marimba and whistle) */
@@ -79,7 +79,8 @@ enum { SEC_INTRO, SEC_A, SEC_A2, SEC_B, SEC_A3 };
 #define INTRO_BARS 2
 #define SONG_BARS (INTRO_BARS + 32)
 #define LOOP_BAR INTRO_BARS
-#define STEP_SECONDS (60.0 / 98.0 / 4.0)   /* sixteenth notes at 98 bpm */
+#define BPM 88.0
+#define STEP_SECONDS (60.0 / BPM / 4.0)   /* sixteenth notes */
 
 static int section_of(int bar, int *in) {
     if (bar < INTRO_BARS) { *in = bar; return SEC_INTRO; }
@@ -218,8 +219,8 @@ typedef struct { float *buf; int len, pos; } Allpass;
 static float rv_mem[2][4 * 700 + 2 * 340];
 static Comb combs[2][4];
 static Allpass aps[2][2];
-#define DELAY_LEN ((int)(MS_RATE * 60.0 / 98.0 * 0.75))   /* a dotted eighth */
-static float dly[2][MS_RATE / 2];
+#define DELAY_LEN ((int)(MS_RATE * 60.0 / BPM * 0.75))   /* a dotted eighth */
+static float dly[2][MS_RATE * 6 / 10];   /* room for a dotted eighth at this tempo (0.51 s) */
 static int dly_pos;
 static float dly_lp[2];
 
@@ -273,18 +274,17 @@ void ms_reset(void) {
     mlp_l = mlp_r = 0;
 }
 
-/* the bass in half a bar: root, octave skip, fifth, and a lead-in to the next chord */
+/* the bass in half a bar, bossa style: the root on the beat, the fifth on
+ * the "and" of the next beat (or a step into the next chord when it changes) */
 static void bass_half(int root, int next_root, int pos, bool lead_in) {
     switch (pos) {
-    case 0: play_bass(root, 2.5f, 1.0f); break;
-    case 3: play_bass(root + 12, 0.8f, 0.35f); break;
-    case 4: play_bass(root + 7, 1.6f, 0.85f); break;
+    case 0: play_bass(root, 5.5f, 1.0f); break;
     case 6:
-        if (lead_in) {
+        if (lead_in && next_root != root) {
             int d = next_root - root;
-            play_bass(d > 0 ? next_root - 1 : next_root + 1, 1.6f, 0.7f);   /* a step into the next root */
+            play_bass(d > 0 ? next_root - 1 : next_root + 1, 1.6f, 0.65f);   /* a step into the next root */
         } else {
-            play_bass(root + 12, 1.2f, 0.7f);
+            play_bass(root + 7 - (root + 7 > 50 ? 12 : 0), 1.8f, 0.75f);   /* the fifth (kept low) */
         }
         break;
     }
@@ -299,25 +299,31 @@ static void play_step(long s) {
     int sec = section_of(bar, &in);
     const Bar *b = sec == SEC_B ? &bars_b[in] : &bars_a[in];   /* the intro has A's first two chords */
     int ch = pos < 8 ? b->c1 : b->c2;
-    /* the next bar's first chord, for the bass's lead-in */
+    /* the next half bar's chord, for the bass's lead-in */
     int nbar = bar + 1 >= SONG_BARS ? LOOP_BAR : bar + 1, nin;
     int nsec = section_of(nbar, &nin);
     const Bar *nb = nsec == SEC_B ? &bars_b[nin] : &bars_a[nin];
     int next_root = pos < 8 ? chords[b->c2].root : chords[nb->c1].root;
-    bool split = b->c1 != b->c2;
 
-    /* bass */
+    /* bass (from the intro's second bar) */
     if (!(sec == SEC_INTRO && in == 0))
-        bass_half(chords[ch].root, next_root, pos & 7, split || pos >= 8);
+        bass_half(chords[ch].root, next_root, pos & 7, true);
 
-    /* electric piano on the off-beats (a held chord on the downbeat in B) */
-    static const signed char ep_at[16] = { 0, 0, 1, 0, 0, 0, 0, 2, 0, 0, 1, 0, 0, 0, 3, 0 };
-    if (sec == SEC_B && pos == 0) {
-        for (int k = 0; k < 4; k++) play_ep(chords[ch].ep[k], 7, 0.75f, k * 0.3f - 0.45f);
-    } else if (ep_at[pos]) {
-        float vel = ep_at[pos] == 1 ? 0.9f : ep_at[pos] == 2 ? 0.55f : 0.7f;
-        if (sec == SEC_B) vel *= 0.7f;
-        for (int k = 0; k < 4; k++) play_ep(chords[ch].ep[k], 2.5f, vel * (k == 3 ? 0.85f : 1), k * 0.3f - 0.45f);
+    /* electric piano: the bossa comping rhythm, two bars long (held chords in B) */
+    static const signed char comp[2][16] = {
+        { 1, 0, 0, 2, 0, 0, 2, 0, 0, 0, 2, 0, 1, 0, 0, 0 },
+        { 0, 0, 2, 0, 0, 0, 2, 0, 1, 0, 0, 2, 0, 0, 2, 0 },
+    };
+    int hit = comp[bar & 1][pos];
+    if (sec == SEC_INTRO && in == 0) {
+        if (pos == 0) for (int k = 0; k < 4; k++) play_ep(chords[ch].ep[k], 14, 0.7f, k * 0.3f - 0.45f);
+    } else if (sec == SEC_B) {
+        if (pos == 0) for (int k = 0; k < 4; k++) play_ep(chords[ch].ep[k], 9, 0.75f, k * 0.3f - 0.45f);
+        else if (pos == 10 || (pos == 8 && b->c1 != b->c2))
+            for (int k = 0; k < 4; k++) play_ep(chords[ch].ep[k], 3, 0.45f, k * 0.3f - 0.45f);
+    } else if (hit) {
+        float vel = hit == 1 ? 0.85f : 0.6f;
+        for (int k = 0; k < 4; k++) play_ep(chords[ch].ep[k], hit == 1 ? 3.0f : 1.8f, vel * (k == 3 ? 0.85f : 1), k * 0.3f - 0.45f);
     }
 
     /* the tune */
@@ -330,30 +336,35 @@ static void play_step(long s) {
         if (sec == SEC_A) play_mallet(note, 0.95f, -0.1f);
         else if (sec == SEC_A2) play_whistle(note, t[k].len - 0.3f, 1, 0.1f);
         else if (sec == SEC_B) {
-            play_whistle(note, t[k].len - 0.3f, 0.95f, 0.1f);
-            if (t[k].len >= 4) play_mallet(note - 12, 0.4f, -0.4f);
+            play_whistle(note, t[k].len - 0.3f, 0.9f, 0.1f);
+            if (t[k].len >= 6) play_mallet(note - 12, 0.35f, -0.4f);
         } else {
             play_mallet(note + ((pass & 1) ? 12 : 0), 0.9f, -0.15f);
-            play_whistle(note - 12, t[k].len - 0.3f, 0.6f, 0.2f);
+            play_whistle(note - 12, t[k].len - 0.3f, 0.55f, 0.2f);
         }
     }
-    /* little marimba arpeggios under the whistle */
-    if (sec == SEC_A2 && (pos == 0 || pos == 3 || pos == 6 || pos == 8 || pos == 11 || pos == 14)) {
-        static const signed char order[6] = { 0, 2, 1, 3, 2, 1 };
-        int i = pos == 0 ? 0 : pos == 3 ? 1 : pos == 6 ? 2 : pos == 8 ? 3 : pos == 11 ? 4 : 5;
-        play_mallet(chords[ch].ep[order[i]] + 12, 0.38f, 0.45f);
+    /* little marimba arpeggios under the whistle, up and down the chord */
+    if (sec == SEC_A2 && (pos & 1) == 0 && pos != 2 && pos != 10) {
+        static const signed char order[8] = { 0, 1, 2, 3, 2, 1, 2, 3 };
+        play_mallet(chords[ch].ep[order[pos / 2]] + 12, pos == 0 || pos == 8 ? 0.4f : 0.3f, 0.45f);
     }
 
     /* percussion */
     bool drums = sec != SEC_INTRO;
-    if (!(pos & 1)) play_shaker(((pos & 2) ? 0.9f : 0.55f) * (0.85f + 0.3f * frand()), (pos & 2) ? 0.35f : 0.2f);   /* eighths only */
+    if (!(pos & 1)) play_shaker(((pos & 2) ? 0.8f : 0.5f) * (0.85f + 0.3f * frand()), (pos & 2) ? 0.35f : 0.2f);   /* eighths only */
     if (drums) {
-        if (pos == 0 || pos == 8) play_kick(pos == 8 ? 0.6f : 1);
-        if (pos == 4 || pos == 12) play_snap(sec == SEC_B ? 0.7f : 1);
+        if (pos == 0) play_kick(0.85f);
+        if (pos == 8) play_kick(0.5f);
+        /* the rim click on the bossa clave (three, then two) */
+        static const signed char clave[2][16] = {
+            { 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+            { 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0 },
+        };
+        if (clave[bar & 1][pos]) play_snap(sec == SEC_B ? 0.5f : 0.7f);
         /* a fill into the last A */
-        if (sec == SEC_B && in == 7 && (pos == 13 || pos == 14 || pos == 15)) play_snap(0.55f + 0.15f * (pos - 13));
-    } else if (in == 1 && (pos == 12 || pos == 14)) {
-        play_snap(0.6f);   /* a count-in */
+        if (sec == SEC_B && in == 7 && (pos == 12 || pos == 14)) play_snap(0.55f + 0.1f * (pos - 12));
+    } else if (in == 1 && (pos == 8 || pos == 12)) {
+        play_snap(0.5f);   /* a count-in */
     }
 }
 
