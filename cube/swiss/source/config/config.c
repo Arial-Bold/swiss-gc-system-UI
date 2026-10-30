@@ -16,6 +16,7 @@
 #include "config.h"
 #include "settings.h"
 #include "bba.h"
+#include "tzdata.h"
 
 // This is an example Swiss settings entry (sits at the top of global.ini)
 //!!Swiss Settings Start!!
@@ -154,10 +155,12 @@ int config_update_global(bool checkConfigDevice) {
 	fprintf(fp, "System Video=%s\r\n", sramVideoStr[swissSettings.sramVideo]);
 	fprintf(fp, "Screen Position=%+hi\r\n", swissSettings.sramHOffset);
 	fprintf(fp, "System Language=%s\r\n", sramLanguageStr[swissSettings.sramLanguage]);
+	fprintf(fp, "System Time Zone=%s\r\n", swissSettings.timeZone);
 	fprintf(fp, "Swiss Video Mode=%s\r\n", uiVModeStr[swissSettings.uiVMode]);
 	fprintf(fp, "Swiss Screen=%s\r\n", uiWidescreenStr[swissSettings.uiWidescreen ? 1 : 0]);
 	fprintf(fp, "Swiss Picture Width=%s\r\n", uiPictureWidthStr[swissSettings.uiPictureWidth ? 1 : 0]);
 	fprintf(fp, "Swiss Overscan=%i\r\n", swissSettings.uiOverscan);
+	fprintf(fp, "Apps Video Mode=%s\r\n", uiVModeStr[swissSettings.appsVMode]);
 	fprintf(fp, "Disable PAD Recalibration=%s\r\n", swissSettings.disableRecalibration ? "Yes":"No");
 	fprintf(fp, "Disable PAD Rumble=%s\r\n", swissSettings.disableRumble ? "Yes":"No");
 	fprintf(fp, "Enable USB Gecko=%s\r\n", enableUSBGeckoStr[swissSettings.enableUSBGecko]);
@@ -184,6 +187,7 @@ int config_update_global(bool checkConfigDevice) {
 	fprintf(fp, "AppsBrowserType=%s\r\n", fileBrowserTypeStr[swissSettings.appsBrowserType]);
 	fprintf(fp, "GameBrowserType=%s\r\n", fileBrowserTypeStr[swissSettings.gameBrowserType]);
 	fprintf(fp, "BS2Boot=%s\r\n", bs2BootStr[swissSettings.bs2Boot]);
+	fprintf(fp, "SNTPHostIP=%s\r\n", swissSettings.sntpHostIp);
 	fprintf(fp, "RT4KHostIP=%s\r\n", swissSettings.rt4kHostIp);
 	fprintf(fp, "RT4KPort=%hu\r\n", swissSettings.rt4kPort);
 	fprintf(fp, "RT4KOptim=%s\r\n", swissSettings.rt4kOptim ? "Yes":"No");
@@ -859,10 +863,23 @@ void config_parse_global(char *configData) {
 						}
 					}
 				}
+				else if(!strcmp("System Time Zone", name)) {
+					if(get_timezone(value)) {
+						strlcpy(swissSettings.timeZone, value, sizeof(swissSettings.timeZone));
+					}
+				}
 				else if(!strcmp("Swiss Video Mode", name)) {
 					for(int i = 0; i < 9; i++) {
 						if(!strcmp(uiVModeStr[i], value)) {
 							swissSettings.uiVMode = i;
+							break;
+						}
+					}
+				}
+				else if(!strcmp("Apps Video Mode", name)) {
+					for(int i = 0; i < 9; i++) {
+						if(!strcmp(uiVModeStr[i], value)) {
+							swissSettings.appsVMode = i;
 							break;
 						}
 					}
@@ -1019,6 +1036,9 @@ void config_parse_global(char *configData) {
 							break;
 						}
 					}
+				}
+				else if(!strcmp("SNTPHostIP", name)) {
+					strlcpy(swissSettings.sntpHostIp, value, sizeof(swissSettings.sntpHostIp));
 				}
 				else if(!strcmp("RT4KHostIP", name)) {
 					strlcpy(swissSettings.rt4kHostIp, value, sizeof(swissSettings.rt4kHostIp));
@@ -1427,6 +1447,12 @@ void config_update_environ() {
 	sprintf(txtbuffer, "LANG=%s.%s", sramLanguageEnvStr[swissSettings.sramLanguage], nl_langinfo(CODESET));
 	putenv(txtbuffer);
 	
+	const char *tzenv = get_timezone(swissSettings.timeZone);
+	if(tzenv != NULL)
+		setenv("TZ", tzenv, 1);
+	else
+		unsetenv("TZ");
+	
 	if(swissSettings.enableUSBGecko) {
 		sprintf(txtbuffer, "USBGECKO_CHANNEL=%i", swissSettings.enableUSBGecko - USBGECKO_MEMCARD_SLOT_A);
 		putenv(txtbuffer);
@@ -1446,6 +1472,7 @@ void config_update_environ() {
 	
 	__PADDisableRecalibration(swissSettings.disableRecalibration);
 	__PADDisableRumble(swissSettings.disableRumble);
+	__SYS_InitTime();
 }
 
 SwissSettings backup;
