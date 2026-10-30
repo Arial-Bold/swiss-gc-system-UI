@@ -1,6 +1,6 @@
 /* -----------------------------------------------------------
       SystemLook.h - the GameCube "System" look for Swiss's own screens
-      (grid backdrop, teal-black panels, frosted rows, glass buttons and
+      (a TV-screen backdrop, teal-black panels, frosted rows, glass buttons and
       the gold selection ring), plus the screen shape settings: 4:3 or
       16:9 and overscan.
 
@@ -32,7 +32,7 @@ void sysOutline(float x, float y, float w, float h, float r, float t, GXColor c)
 void sysTriangle(float x0, float y0, float x1, float y1, float x2, float y2, GXColor c);
 
 // Pieces of the look
-void sysBackdrop(void);                                            // fills the whole screen
+void sysBackdrop(void);                                            // CubeVerse's TV screen, filling the whole screen
 void sysPanel(float x, float y, float w, float h);                 // a window or box
 void sysFrostRow(float x, float y, float w, float h, int alpha);   // a list row (alpha 0-255)
 void sysButton(float x, float y, float w, float h, bool gold);     // grey (or gold) glass

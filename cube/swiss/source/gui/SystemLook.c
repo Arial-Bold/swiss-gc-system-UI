@@ -175,26 +175,105 @@ static void shadow(float x, float y, float w, float h, float r, float spread, GX
 
 /* ------------------------------------------------------- pieces of the look */
 
-// Near black, a 24-unit grid centred on the screen, darker towards the edges
+/* The backdrop: CubeVerse's "soft phosphor" TV screen. A deep blue-black,
+ * a cool glow in the middle, soft scanlines bowed by the curve of the glass,
+ * and a dark edge shaped like a picture tube. It fills the whole screen
+ * whatever its shape (stretching sideways in 16:9, as CubeVerse does). */
+
+static void mesh(int cols, int rows, const float *xy, const GXColor *c) {
+	for(int r = 0; r < rows; r++) {
+		GX_Begin(GX_TRIANGLESTRIP, GX_VTXFMT0, (cols + 1) * 2);
+			for(int k = 0; k <= cols; k++) {
+				for(int d = 0; d < 2; d++) {
+					int i = (r + d) * (cols + 1) + k;
+					vtx(xy[i * 2], xy[i * 2 + 1], c[i]);
+				}
+			}
+		GX_End();
+	}
+}
+
+static inline float clamp01(float t) { return t < 0 ? 0 : t > 1 ? 1 : t; }
+
+// A point of the screen bowed out like the face of a picture tube (u, v from -1 to 1)
+static void tubePoint(float fx, float fy, float fw, float fh, float u, float v, float k, float *x, float *y) {
+	float bu = u * (1 + k * v * v), bv = v * (1 + k * 1.4f * u * u);
+	*x = fx + fw * (bu + 1) / 2;
+	*y = fy + fh * (bv + 1) / 2;
+}
+
+// Scanlines: a soft band per line (clear, full, full, then clear at the next line)
+static void scanlines(float fx, float fy, float fw, float fh, float period, float bulge, GXColor c) {
+	enum { SC = 16, ROWS = 63 };
+	static float xy[(SC + 1) * (ROWS + 1) * 2];
+	static GXColor col[(SC + 1) * (ROWS + 1)];
+	static const float pos[3] = { 0, 0.3f, 0.72f };
+	int nrows = (int)(fh / period) * 3 + 1;
+	for(int r0 = 0; r0 < nrows - 1; r0 += ROWS) {
+		int rows = nrows - 1 - r0 < ROWS ? nrows - 1 - r0 : ROWS;
+		for(int j = 0; j <= rows; j++) {
+			int r = r0 + j, line = r / 3, ph = r % 3;
+			float v = (line + pos[ph]) * period / fh * 2 - 1;
+			for(int i = 0; i <= SC; i++) {
+				int k = j * (SC + 1) + i;
+				tubePoint(fx, fy, fw, fh, (float)i / SC * 2 - 1, v, bulge, &xy[k * 2], &xy[k * 2 + 1]);
+				col[k] = rgba(c.r, c.g, c.b, ph ? c.a : 0);
+			}
+		}
+		mesh(SC, rows, xy, col);
+	}
+}
+
+// The dark edge, shaped like a TV tube: a rounded rectangle (a superellipse)
+static void tubeEdge(float fx, float fy, float fw, float fh, float start) {
+	enum { VC = 24, VR = 18 };
+	static float vxy[(VC + 1) * (VR + 1) * 2];
+	static GXColor vc[(VC + 1) * (VR + 1)];
+	for(int j = 0; j <= VR; j++) {
+		for(int i = 0; i <= VC; i++) {
+			int k = j * (VC + 1) + i;
+			float u = (float)i / VC * 2 - 1, v = (float)j / VR * 2 - 1;
+			vxy[k * 2] = fx + fw * i / VC;
+			vxy[k * 2 + 1] = fy + fh * j / VR;
+			float au = fabsf(u) * 1.02f, av = fabsf(v) * 1.04f;
+			float d = powf(powf(au, 5) + powf(av, 5), 0.2f);	// 1 on the rounded rectangle
+			float d2 = sqrtf(u * u * 0.8f + v * v);			// and a gentle round falloff inside
+			float t = clamp01((d - start) / (1.0f - start)), t2 = clamp01((d2 - 0.35f) / 0.9f);
+			float a = 1 - (1 - powf(t, 1.6f)) * (1 - 0.55f * t2 * t2);
+			vc[k] = rgba(0, 0, 0, (u8)(clamp01(a) * 255));
+		}
+	}
+	mesh(VC, VR, vxy, vc);
+}
+
 void sysBackdrop(void) {
 	float l, t, r, b;
 	sysViewBounds(&l, &t, &r, &b);
-	float w = r - l, h = b - t;
-	sysRect(l, t, w, h, rgba(6, 6, 8, 255));
-	GXColor line = rgba(37, 37, 43, 255);
-	float px = pixelW(), py = pixelH();
-	float lw = roundf(2.0f / px) * px, lh = roundf(2.0f / py) * py;	// whole pixels, so the spacing stays even
-	if(lw < px) lw = px;
-	if(lh < py) lh = py;
-	for(float gx = 320.0f - 24.0f * ceilf((320.0f - l) / 24.0f); gx < r; gx += 24.0f)
-		sysRect(roundf(gx / px) * px, t, lw, h, line);
-	for(float gy = 240.0f - 24.0f * ceilf((240.0f - t) / 24.0f); gy < b; gy += 24.0f)
-		sysRect(l, roundf(gy / py) * py, w, lh, line);
-	float vw = w * 0.32f, vh = 150.0f;
-	sysRectH(l, t, vw, h, rgba(0, 0, 0, 150), rgba(0, 0, 0, 0));
-	sysRectH(r - vw, t, vw, h, rgba(0, 0, 0, 0), rgba(0, 0, 0, 150));
-	sysRectV(l, t, w, vh, rgba(0, 0, 0, 120), rgba(0, 0, 0, 0));
-	sysRectV(l, b - vh, w, vh, rgba(0, 0, 0, 0), rgba(0, 0, 0, 120));
+	float fx = l, fy = t, fw = r - l, fh = b - t;
+	sysRectV(fx, fy, fw, fh, rgba(0x1c, 0x24, 0x31, 255), rgba(0x0c, 0x10, 0x16, 255));
+	// a cool glow, strongest in the middle, and a fainter one lower down
+	enum { C = 12, R = 8 };
+	static float xy[(C + 1) * (R + 1) * 2];
+	static GXColor col[(C + 1) * (R + 1)];
+	const float glow = 1.7f;
+	for(int pass = 0; pass < 2; pass++) {
+		for(int j = 0; j <= R; j++) {
+			for(int i = 0; i <= C; i++) {
+				int k = j * (C + 1) + i;
+				float x = fx + fw * i / C, y = fy + fh * j / R;
+				xy[k * 2] = x;
+				xy[k * 2 + 1] = y;
+				float dx = (x - (fx + fw / 2)) / (fw * (pass ? 0.45f : 0.6f));
+				float dy = pass ? (y - (fy + fh * 0.5f)) / (fh * 0.5f) : (y - (fy + fh * 0.3f)) / (fh * 0.7f);
+				float v = clamp01(1 - sqrtf(dx * dx + dy * dy) / (pass ? 0.66f : 0.62f));
+				col[k] = pass ? rgba(60, 110, 175, (u8)(clamp01(v * 0.13f * glow) * 255))
+				              : rgba(120, 170, 225, (u8)(clamp01(v * 0.17f * glow) * 255));
+			}
+		}
+		mesh(C, R, xy, col);
+	}
+	scanlines(fx, fy, fw, fh, 8, 0.06f, rgba(0, 0, 0, 150));
+	tubeEdge(fx, fy, fw, fh, 0.62f);
 }
 
 // Square frame: a light outer line, a dark inner one, and a teal-black fill
@@ -234,10 +313,11 @@ static void gridPatch(float x, float y, float w, float h, float cell, float span
 	}
 }
 
+// Plain frosted glass (no grid, so it stays calm over the backdrop), mostly opaque
 void sysFrostRow(float x, float y, float w, float h, int alpha) {
 	float k = alpha / 255.0f;
-	sysRectV(x, y, w, h, withAlpha(rgba(140, 160, 180, 87), k), withAlpha(rgba(70, 90, 110, 56), k));
-	gridPatch(x + 1, y + 1, w - 2, h - 2, 7, 0.45f, false, withAlpha(rgba(200, 235, 245, 51), k));
+	sysRectV(x, y, w, h, withAlpha(rgba(76, 94, 114, 205), k), withAlpha(rgba(40, 54, 70, 215), k));
+	sysRect(x + 1, y + 1, w - 2, 1, withAlpha(rgba(255, 255, 255, 40), k));	// top light
 	sysOutline(x, y, w, h, 2, 1, withAlpha(rgba(215, 225, 240, 153), k));
 }
 
