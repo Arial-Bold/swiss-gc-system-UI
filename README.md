@@ -1,3 +1,38 @@
+# Swiss System UI
+
+An unofficial fork of [Swiss](https://github.com/emukidid/swiss-gc) that restyles its screens in the GameCube "System" look. Only the interface changes. Games, programs, devices and patching all work exactly as they do in Swiss.
+
+**Version 1.1 is based on Swiss 0.7.0.**
+
+> This fork isn't made or supported by the Swiss developers. Please report UI problems here rather than to the Swiss project.
+
+### What's different
+- **The System look:** a TV-screen backdrop, teal-black panels, frosted setting rows with alternating stripes, glass buttons and the gold selection ring, across Swiss's own screens. The original Swiss logo is kept.
+- **Widescreen:** a 16:9 setting that lays Swiss out wider so nothing looks stretched on widescreen TVs.
+- **Picture Width:** Full (704) to fill the TV like games do, or Standard (640) for TVs and scalers that cut off the edges.
+- **Overscan:** pulls the screens in from the edges for TVs that hide part of the picture.
+- **Resolution:** pick the video mode for Swiss's own screens, or leave it on Auto.
+- **Menu Music and Menu Sounds:** an original, mellow tune and soft menu sounds, both generated on the console. Both stop before a game or program starts, and the music waits while the MP3 player is open.
+
+All of these are under **Settings → Interface Settings**. They only affect Swiss's screens, never games.
+
+### What's new in 1.1
+- Merged up to Swiss 0.7.0, which brings System Date, System Time and time zone settings, a new SMB library, smaller builds, and updated game databases. See the [Swiss 0.7.0 release](https://github.com/emukidid/swiss-gc/releases/tag/v0.7.0) for the full list.
+- The new System Date and System Time rows are restyled to match the rest of the System look.
+
+### Installing
+Download the latest release from this repository's **Releases** page and install it the same way as Swiss (see [Usage](#usage) below). Your existing Swiss settings carry over. The fork's own settings start at their defaults.
+
+### Building
+Same as Swiss: push to GitHub and the included workflow builds every release package, or build locally with devkitPPC and libogc2. The version shown in the title bar is set in `cube/swiss/Makefile` (`SWISS_BASE_VERSION`), because GitHub forks don't receive Swiss's newer release tags.
+
+### Credits
+Swiss is by emu_kidid, Extrems and its contributors. The System UI restyle is a fan project, and the menu music and sounds are original compositions.
+
+---
+
+*The original Swiss README follows.*
+
 # Swiss
 
 [![Build Status](https://github.com/emukidid/swiss-gc/actions/workflows/continuous-integration-workflow.yml/badge.svg)](https://github.com/emukidid/swiss-gc/actions/workflows/continuous-integration-workflow.yml)
