@@ -60,7 +60,7 @@ compile-patches:
 	@cd $(PATCHES) && $(MAKE)
 
 compile: # compile
-	@$(PACMAN) -Q devkitppc-licenses gamecube-tools-git libogc2-git libogc2-libdvm-git libogc2-pkg-config ppc-libdeflate ppc-libiconv-lite ppc-libmad ppc-libpsoarchive ppc-libuchardet ppc-libxxhash ppc-zlib-ng-compat
+	@$(PACMAN) -Q devkitppc-licenses gamecube-tools-git libogc2-git libogc2-libdvm-git libogc2-libsmb2 libogc2-pkg-config ppc-libdeflate ppc-libiconv-lite ppc-libmad ppc-libpsoarchive ppc-libuchardet-lite ppc-libxxhash ppc-zlib-ng-compat
 	@cd $(SOURCES)/swiss && $(MAKE)
 
 compile-packer:
@@ -90,6 +90,7 @@ build:
 	@cp LICENSE $(DIST)/LICENSE.txt
 	@cp $(SOURCES)/swiss/source/littlefs/LICENSE.md $(DIST)/Licenses/littlefs.txt
 	@cp $(DEVKITPRO)/libogc2/gamecube/share/licenses/libdvm/COPYING $(DIST)/Licenses/libdvm.txt
+	@cp $(DEVKITPRO)/libogc2/gamecube/share/licenses/libsmb2/LICENCE-LGPL-2.1.txt $(DIST)/Licenses/libsmb2.txt
 	@cp $(DEVKITPRO)/libogc2/gamecube/share/licenses/lwip/COPYING $(DIST)/Licenses/lwip.txt
 	@cp $(DEVKITPRO)/libogc2/libogc2_license.txt $(DIST)/Licenses/libogc2.txt
 	@cp $(DEVKITPRO)/libogc2/rtems_license.txt $(DIST)/Licenses/rtems.txt
@@ -99,7 +100,7 @@ build:
 	@cp $(DEVKITPRO)/portlibs/ppc/licenses/ppc-libiconv-lite/COPYING.LIB $(DIST)/Licenses/libiconv.txt
 	@cp $(DEVKITPRO)/portlibs/ppc/licenses/ppc-libmad/COPYING $(DIST)/Licenses/libmad.txt
 	@cp $(DEVKITPRO)/portlibs/ppc/licenses/ppc-libpsoarchive/COPYING.LGPL21 $(DIST)/Licenses/libpsoarchive.txt
-	@cp $(DEVKITPRO)/portlibs/ppc/licenses/ppc-libuchardet/COPYING $(DIST)/Licenses/uchardet.txt
+	@cp $(DEVKITPRO)/portlibs/ppc/licenses/ppc-libuchardet-lite/COPYING $(DIST)/Licenses/uchardet.txt
 	@cp $(DEVKITPRO)/portlibs/ppc/licenses/ppc-libxxhash/LICENSE $(DIST)/Licenses/xxhash.txt
 	@cp $(DEVKITPRO)/portlibs/ppc/licenses/ppc-zlib-ng-compat/LICENSE.md $(DIST)/Licenses/zlib-ng.txt
 	# make ISOs and WKF firmware
@@ -151,8 +152,8 @@ package:   # create distribution package
 	@mv $(DIST)/WODE $(SVN_REVISION)
 	@find ./$(SVN_REVISION) -type f -print0 | xargs -0 sha256sum > $(SVN_REVISION).sha256
 	@mv $(SVN_REVISION).sha256 $(SVN_REVISION)
-	@git log -n 4 > $(SVN_REVISION)-changelog.txt
-	@sed -i "s/emukidid <emukidid@gmail.com>/emu_kidid/g" $(SVN_REVISION)-changelog.txt
+	@git log $(shell git describe --tags --abbrev=0 HEAD^)..HEAD > $(SVN_REVISION)-changelog.txt
+	@sed -i 's/ <.*@.*>//g' $(SVN_REVISION)-changelog.txt
 	@mv $(SVN_REVISION)-changelog.txt $(SVN_REVISION)
 	@cp $(BUILDTOOLS)/SWISS_FILE_DESCRIPTIONS.txt $(SVN_REVISION)
 	@mv $(DIST)/LICENSE.txt $(SVN_REVISION)
