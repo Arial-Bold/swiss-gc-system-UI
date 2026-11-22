@@ -37,6 +37,7 @@
 #include <ogc/timesupp.h>
 #include <string.h>
 #include <unistd.h>
+#include "sram.h"
 #include "swiss.h"
 
 /** This is an example of a "SNTP" client (with socket API).
@@ -68,12 +69,13 @@
 
 /** SNTP macro to change system time and/or the update the RTC clock */
 #ifndef SNTP_SYSTEM_TIME
-#define SNTP_SYSTEM_TIME(t)         __SYS_SetRTC((t) - DIFF_SEC_1970_2000)
+#define SNTP_SYSTEM_TIME(t)         updateRTC(t)
 #endif
 
 /* SNTP protocol defines */
 #define SNTP_MAX_DATA_LEN           48
 #define SNTP_RCV_TIME_OFS           32
+#define SNTP_XMT_TIME_OFS           40
 #define SNTP_LI_NO_WARNING          0x00
 #define SNTP_VERSION               (4/* NTP Version 4*/<<3) 
 #define SNTP_MODE_CLIENT            0x03
@@ -123,7 +125,7 @@ sntp_request()
       /* prepare local address */
       memset(&local, 0, sizeof(local));
       local.sin_family      = AF_INET;
-      local.sin_port        = htons(INADDR_ANY);
+      local.sin_port        = htons(SNTP_PORT);
       local.sin_addr.s_addr = htonl(INADDR_ANY);
 
       /* bind to local address */
@@ -153,8 +155,8 @@ sntp_request()
             /* if this is a SNTP response... */
             if (((sntp_response[0] & SNTP_MODE_MASK) == SNTP_MODE_SERVER) || ((sntp_response[0] & SNTP_MODE_MASK) == SNTP_MODE_BROADCAST)) {
               /* extract GMT time from response */
-              memcpy( &timestamp, (sntp_response+SNTP_RCV_TIME_OFS), sizeof(timestamp));
-              t = (ntohl(timestamp) - DIFF_SEC_1900_1970);
+              memcpy( &timestamp, (sntp_response+SNTP_XMT_TIME_OFS), sizeof(timestamp));
+              t = (u32)(ntohl(timestamp) - DIFF_SEC_1900_1970);
 
               /* do time processing */
               sntp_process(t);

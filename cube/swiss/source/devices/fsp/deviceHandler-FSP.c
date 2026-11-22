@@ -55,7 +55,7 @@ s32 deviceHandler_FSP_readDir(file_handle* ffile, file_handle** dir, u32 type) {
 			// Make sure we have room for this one
 			if(num_entries == i) {
 				num_entries *= 2;
-				*dir = reallocarray(*dir, num_entries, sizeof(file_handle));
+				if(reallocarr(dir, num_entries, sizeof(file_handle))) break;
 			}
 			memset(&(*dir)[i], 0, sizeof(file_handle));
 			if(concat_path((*dir)[i].name, ffile->name, entry.name) < PATHNAME_MAX) {
@@ -68,7 +68,7 @@ s32 deviceHandler_FSP_readDir(file_handle* ffile, file_handle** dir, u32 type) {
 	}
 	if(num_entries != i) {
 		num_entries = i;
-		*dir = reallocarray(*dir, num_entries, sizeof(file_handle));
+		reallocarr(dir, num_entries, sizeof(file_handle));
 	}
 	
 	fsp_closedir(dp);
@@ -76,11 +76,11 @@ s32 deviceHandler_FSP_readDir(file_handle* ffile, file_handle** dir, u32 type) {
 }
 
 s32 deviceHandler_FSP_statFile(file_handle* file) {
-	struct stat fstat;
-	int ret = fsp_stat(fsp_session, getDevicePath(file->name), &fstat);
+	struct stat st;
+	int ret = fsp_stat(fsp_session, getDevicePath(file->name), &st);
 	if(ret == 0) {
-		file->size     = fstat.st_size;
-		file->fileType = S_ISDIR(fstat.st_mode) ? IS_DIR : IS_FILE;
+		file->size     = st.st_size;
+		file->fileType = S_ISDIR(st.st_mode) ? IS_DIR : IS_FILE;
 	}
 	return ret;
 }

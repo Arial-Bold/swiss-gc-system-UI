@@ -8,6 +8,7 @@
    ----------------------------------------------------------- */
 
 #include <fnmatch.h>
+#include <stdatomic.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -29,6 +30,7 @@
 #include "btns.h"
 #include "dolparameters.h"
 #include "cheats.h"
+#include "sram.h"
 #include "SystemLook.h"
 #include "uiaudio.h"
 
@@ -160,7 +162,7 @@ typedef struct drawImageEvent {
 typedef struct drawStyledLabelEvent {
 	int x;
 	int y;
-	const char *(*getString)(void);
+	const char *(*getString)(const char *format);
 	char *string;
 	float size;
 	int align;
@@ -990,7 +992,7 @@ uiDrawObj_t* DrawTooltip(const char *tooltip) {
 // Internal
 static void _DrawStyledLabel(uiDrawObj_t *evt) {
 	drawStyledLabelEvent_t *data = (drawStyledLabelEvent_t*)evt->data;
-	const char *string = data->getString ? data->getString() : data->string;
+	const char *string = data->getString ? data->getString(data->string) : data->string;
 	
 	if(data->showCaret) {
 		// blink the caret
@@ -1103,7 +1105,7 @@ uiDrawObj_t* DrawFadingLabel(int x, int y, const char *string, float size)
 }
 
 // External
-uiDrawObj_t* DrawDynamicLabel(int x, int y, const char *(*getString)(void), float size, int align, GXColor color)
+uiDrawObj_t* DrawDynamicLabel(int x, int y, const char *getString(const char *format), float size, int align, GXColor color)
 {	
 	drawStyledLabelEvent_t *eventData = calloc(1, sizeof(drawStyledLabelEvent_t));
 	eventData->x = x;
@@ -1115,6 +1117,24 @@ uiDrawObj_t* DrawDynamicLabel(int x, int y, const char *(*getString)(void), floa
 	uiDrawObj_t *event = calloc(1, sizeof(uiDrawObj_t));
 	event->type = EV_STYLEDLABEL;
 	event->data = eventData;
+	return event;
+}
+
+static const char* getDateTimeString(const char *format) {
+	time_t curtime;
+	if(time(&curtime) != (time_t)-1) {
+		strftime(fbTextBuffer, sizeof(fbTextBuffer), format, localtime(&curtime));
+		return fbTextBuffer;
+	}
+	return NULL;
+}
+
+// External
+uiDrawObj_t* DrawDateTimeLabel(int x, int y, const char *format, float size, int align, GXColor color)
+{	
+	uiDrawObj_t *event = DrawDynamicLabel(x, y, getDateTimeString, size, align, color);
+	drawStyledLabelEvent_t *eventData = (drawStyledLabelEvent_t*)event->data;
+	eventData->string = strdup(format);
 	return event;
 }
 
@@ -1553,9 +1573,9 @@ static void _DrawTitleBar(uiDrawObj_t *evt) {
 	
 	_DrawImageNow(TEX_SWISS, 36, 32, 96, 32, 0, 0.0f, 1.0f, 0.0f, 1.0f, 0);
 	drawString(142, 39, "for GameCube", 0.55f, ALIGN_LEFT, defaultColor);
-	drawString(142, 56, "version 0.6", 0.55f, ALIGN_LEFT, defaultColor);
+	drawString(142, 56, "version " GIT_VERSION, 0.55f, ALIGN_LEFT, defaultColor);
 	
-	sprintf(fbTextBuffer, "commit: %s \267 revision: %s", GIT_COMMIT, GIT_REVISION);
+	sprintf(fbTextBuffer, "commit: %s \267 revision: %i", GIT_COMMIT, GIT_REVISION);
 	drawString(getVideoMode()->fbWidth-36, 56, fbTextBuffer, 0.55f, ALIGN_RIGHT, defaultColor);
 	
 	s8 cputemp = SYS_GetCoreTemperature();
@@ -1640,7 +1660,7 @@ void DrawUpdateProgressBarDetail(uiDrawObj_t *evt, int percent, int speed, int t
 
 void DrawUpdateProgressLoading(uiDrawObj_t *evt, int increment) {
 	drawProgressEvent_t *data = (drawProgressEvent_t*)evt->data;
-	data->speed += increment;
+	atomic_fetch_add(&data->speed, increment);
 }
 
 void DrawUpdateMenuButtons(int selection) {
@@ -1907,10 +1927,17 @@ void DrawCheatsSelector(const char *fileName) {
 
 void DrawGetTextEntry(int mode, const char *label, void *src, int size) {
 	
-	print_debug("DrawGetTextEntry Modes: Alpha [%s] Numeric [%s] IP [%s] Masked [%s] File [%s]\n", mode & ENTRYMODE_ALPHA ? "Y":"N", mode & ENTRYMODE_NUMERIC ? "Y":"N",
-																	mode & ENTRYMODE_IP ? "Y":"N", mode & ENTRYMODE_MASKED ? "Y":"N", mode & ENTRYMODE_FILE ? "Y":"N");
+	print_debug("DrawGetTextEntry Modes: Alpha [%c] Numeric [%c] IP [%c] Masked [%c] File [%c]\n", mode & ENTRYMODE_ALPHA ? 'Y':'N', mode & ENTRYMODE_NUMERIC ? 'Y':'N',
+																	mode & ENTRYMODE_IP ? 'Y':'N', mode & ENTRYMODE_MASKED ? 'Y':'N', mode & ENTRYMODE_FILE ? 'Y':'N');
 	char *text = calloc(1, size + 1);
-	if(mode & (ENTRYMODE_ALPHA|ENTRYMODE_IP)) {
+	if(mode & (ENTRYMODE_DATE | ENTRYMODE_TIME)) {
+		time_t curtime;
+		if(time(&curtime) != (time_t)-1) {
+			struct tm *tm = localtime(&curtime);
+			strftime(text, size + 1, src, tm);
+		}
+	}
+	else if(mode & (ENTRYMODE_ALPHA | ENTRYMODE_FILE | ENTRYMODE_IP)) {
 		strncpy(text, src, size);
 	}
 	else {
@@ -1929,8 +1956,9 @@ void DrawGetTextEntry(int mode, const char *label, void *src, int size) {
 	int num_txt_modes = 0;	// Number of modes the text entry chars will have, e.g. upper case, lowercase etc.
 	char *txt_modes_str[] = {"lowercase", "UPPERCASE"};
 	// char arrays to grab from, exact order is important
-	char *ip_mode_chars = "123456789.0\b";
 	char *num_mode_chars = "1234567890\b";
+	char *num_mode_chars_dot = "123456789.0\b";
+	char *num_mode_chars_colon = "123456789:0\b";
 	char *txt_mode_chars_lower = "1234567890-=\bqwertyuiop[]\\asdfghjkl;'zxcvbnm,./`!@\a#$%";
 	char *txt_mode_chars_upper = "1234567890_+\bQWERTYUIOP{}|ASDFGHJKL:\"ZXCVBNM<>?^&*\a()~";
 	char *txt_mode_file_chars_lower = "1234567890-=\bqwertyuiop[]asdfghjkl;'zxcvbnm.`!\a#$%";
@@ -1938,25 +1966,6 @@ void DrawGetTextEntry(int mode, const char *label, void *src, int size) {
 	
 	int cur_txt_mode = 0;
 	char *gridText = NULL;
-	
-	// IP mode
-	if(mode & ENTRYMODE_IP) {
-		// 1  2  3
-		// 4  5  6
-		// 7  8  9
-		//[.] 0  [backspace]
-		num_rows = 4;
-		grid_gap = 15;
-		num_per_row[0] = 3;
-		pos_for_row[0] = 240;
-		num_per_row[1] = 3;
-		pos_for_row[1] = 240;
-		num_per_row[2] = 3;
-		pos_for_row[2] = 240;
-		num_per_row[3] = 3;
-		pos_for_row[3] = 240;
-		gridText = ip_mode_chars;
-	}
 	
 	// Number only
 	if((mode & ENTRYMODE_NUMERIC) && !(mode & ENTRYMODE_ALPHA)) {
@@ -1978,12 +1987,12 @@ void DrawGetTextEntry(int mode, const char *label, void *src, int size) {
 	}
 	
 	// Alpha only
-	else if(!(mode & ENTRYMODE_NUMERIC) && (mode & ENTRYMODE_ALPHA)) {
+	else if((mode & ENTRYMODE_ALPHA) && !(mode & ENTRYMODE_NUMERIC)) {
 		// TODO if we ever have to.
 	}
 	
 	// Alphanumeric (not file)
-	else if((mode & (ENTRYMODE_NUMERIC | ENTRYMODE_ALPHA)) && !(mode & ENTRYMODE_IP) && !(mode & ENTRYMODE_FILE)) {
+	else if((mode & (ENTRYMODE_ALPHA | ENTRYMODE_NUMERIC)) && !(mode & (ENTRYMODE_FILE | ENTRYMODE_IP))) {
 		/* Mode 0:
 		 1234567890-=<\b aka backspace>
 		 qwertyuiop[]\
@@ -2046,6 +2055,44 @@ void DrawGetTextEntry(int mode, const char *label, void *src, int size) {
 		pos_for_row[4] = 160;
 	}
 	
+	// Date or IP mode
+	else if(mode & (ENTRYMODE_DATE | ENTRYMODE_IP)) {
+		// 1  2  3
+		// 4  5  6
+		// 7  8  9
+		//[.] 0  [backspace]
+		num_rows = 4;
+		grid_gap = 15;
+		num_per_row[0] = 3;
+		pos_for_row[0] = 240;
+		num_per_row[1] = 3;
+		pos_for_row[1] = 240;
+		num_per_row[2] = 3;
+		pos_for_row[2] = 240;
+		num_per_row[3] = 3;
+		pos_for_row[3] = 240;
+		gridText = num_mode_chars_dot;
+	}
+	
+	// Time mode
+	else if(mode & ENTRYMODE_TIME) {
+		// 1  2  3
+		// 4  5  6
+		// 7  8  9
+		//[:] 0  [backspace]
+		num_rows = 4;
+		grid_gap = 15;
+		num_per_row[0] = 3;
+		pos_for_row[0] = 240;
+		num_per_row[1] = 3;
+		pos_for_row[1] = 240;
+		num_per_row[2] = 3;
+		pos_for_row[2] = 240;
+		num_per_row[3] = 3;
+		pos_for_row[3] = 240;
+		gridText = num_mode_chars_colon;
+	}
+	
 	// Wait for any A or Left/Right presses to finish
 	while ((padsButtonsHeld() & (BUTTON_A|BUTTON_LEFT|BUTTON_RIGHT))){ VIDEO_WaitVSync (); }
 	uiDrawObj_t *container = NULL;
@@ -2062,7 +2109,7 @@ void DrawGetTextEntry(int mode, const char *label, void *src, int size) {
 		DrawAddChild(newPanel, DrawStyledLabel(320, 160, "(L/R) Cursor \267 (Start) Accept \267 (B) Discard", 0.75f, ALIGN_CENTER, defaultColor));
 
 		// Alphanumeric has a little "mode" hint at the bottom (upper/lower case set switching)
-		if(mode & ENTRYMODE_ALPHA) {
+		if(mode & (ENTRYMODE_ALPHA | ENTRYMODE_FILE)) {
 			gridText = cur_txt_mode == 0 ? 
 				(mode & ENTRYMODE_FILE ? txt_mode_file_chars_lower : txt_mode_chars_lower)
 				: 
@@ -2164,8 +2211,16 @@ void DrawGetTextEntry(int mode, const char *label, void *src, int size) {
 			break;
 		}
 		if(btns & BUTTON_START) {
-			if(mode & (ENTRYMODE_ALPHA|ENTRYMODE_IP)) {
-				strcpy(src, text);
+			if(mode & (ENTRYMODE_DATE | ENTRYMODE_TIME)) {
+				time_t curtime;
+				if(time(&curtime) != (time_t)-1) {
+					struct tm *tm = localtime(&curtime);
+					strptime(text, src, tm);
+					updateTime(mktime(tm));
+				}
+			}
+			else if(mode & (ENTRYMODE_ALPHA | ENTRYMODE_FILE | ENTRYMODE_IP)) {
+				strncpy(src, text, size);
 			}
 			else {
 				// TODO fix this stuff at some point, we're checking based on text size rather than max val of the data type.

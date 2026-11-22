@@ -57,8 +57,8 @@ INCLUDES	:=	include $(SOURCES) ..
 # options for code generation
 #---------------------------------------------------------------------------------
 
-CFLAGS		= -g -O2 -Wall -Wno-format-truncation -Wno-scalar-storage-order -fno-strict-aliasing -D_GNU_SOURCE $(MACHDEP) $(INCLUDE) $(shell $(PREFIX)pkg-config --cflags libdeflate iconv mad uchardet libxxhash zlib) -D'GIT_COMMIT="$(shell git rev-parse --short HEAD)"' -D'GIT_REVISION="$(shell git rev-list HEAD | wc -l)"' -DLFS_MULTIVERSION
-CXXFLAGS	= $(CFLAGS)
+CFLAGS		= -g -O2 -Wall -Wno-format-truncation -Wno-scalar-storage-order -fno-strict-aliasing -D_GNU_SOURCE $(MACHDEP) $(INCLUDE) $(shell $(PREFIX)pkg-config --cflags libdeflate iconv mad libsmb2 uchardet libxxhash zlib) -DLFS_MULTIVERSION -include defines.h
+CXXFLAGS	= $(CFLAGS) -fno-exceptions -fno-rtti
 
 ASFLAGS		= $(MACHDEP) -mregnames -D_LANGUAGE_ASSEMBLY $(INCLUDE)
 LDFLAGS		= $(CFLAGS) -Wl,-Map,$(notdir $@).map -T ../../linker-script/ogc.ld -T ../../reservedarea.ld
@@ -66,7 +66,7 @@ LDFLAGS		= $(CFLAGS) -Wl,-Map,$(notdir $@).map -T ../../linker-script/ogc.ld -T 
 #---------------------------------------------------------------------------------
 # any extra libraries we wish to link with the project
 #---------------------------------------------------------------------------------
-LIBS	:=	-ldvm -ltinysmb -lbba -laesnd -ldb -logc -lm -lpsoarchive $(shell $(PREFIX)pkg-config --libs libdeflate iconv mad uchardet libxxhash zlib)
+LIBS	:=	-ldvm -lbba -laesnd -ldb -logc -lm -lpsoarchive $(shell $(PREFIX)pkg-config --libs libdeflate iconv mad libsmb2 uchardet libxxhash zlib)
 
 #---------------------------------------------------------------------------------
 # list of directories containing libraries, this must be the top level containing
@@ -113,7 +113,7 @@ export OFILES_BIN	:=	$(addsuffix .o,$(BINFILES)) $(addsuffix .o,$(TPLFILES))
 export OFILES_SOURCES := $(CPPFILES:.cpp=.o) $(CFILES:.c=.o) $(sFILES:.s=.o) $(SFILES:.S=.o)
 export OFILES := $(OFILES_BIN) $(OFILES_SOURCES)
 
-export HFILES := $(addsuffix .h,$(subst .,_,$(BINFILES))) $(addsuffix .h,$(subst .,_,$(TPLFILES))) tags.h
+export HFILES := $(addsuffix .h,$(subst .,_,$(BINFILES))) $(addsuffix .h,$(subst .,_,$(TPLFILES))) tags.h defines.h
 
 #---------------------------------------------------------------------------------
 # build a list of include paths
@@ -169,10 +169,29 @@ $(OFILES_SOURCES) : $(HFILES)
 	$(bin2o)
 
 #---------------------------------------------------------------------------------
+# Fork: the upstream Swiss release this fork is merged up to. Pinned because a
+# GitHub fork doesn't get upstream's newer tags, so git describe would report an old version.
+SWISS_BASE_VERSION := 0.7.0
+SWISS_BASE_COMMIT := 92e63a8
+
+#---------------------------------------------------------------------------------
 tags.h :
 #---------------------------------------------------------------------------------
 	$(SILENTMSG) $(notdir $@)
 	$(SILENTCMD)git for-each-ref --format='"%(objectname:short)",' refs/tags > $@
+	@# Fork: GitHub forks don't carry newer upstream tags, so always list the release this fork is based on
+	@grep -q '"$(SWISS_BASE_COMMIT)' $@ || echo '"$(SWISS_BASE_COMMIT)",' >> $@
+
+#---------------------------------------------------------------------------------
+defines.h :
+#---------------------------------------------------------------------------------
+	$(SILENTMSG) $(notdir $@)
+	@echo '#pragma once' > $@
+	@echo '#define GIT_COMMIT "$(shell git rev-parse --short HEAD)"' >> $@
+	@echo '#define GIT_COPYRIGHT "$(shell git log -1 --committer='^\(emu_\?kidid\|Extrems\) ' --format=%cd --date=format:%Y)"' >> $@
+	@echo '#define GIT_REVISION $(shell git rev-list HEAD | wc -l)' >> $@
+	@echo '#define GIT_TIMESTAMP $(shell git log -1 --format=%ct)' >> $@
+	@echo '#define GIT_VERSION "$(SWISS_BASE_VERSION)"' >> $@
 
 -include $(DEPENDS)
 

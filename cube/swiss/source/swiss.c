@@ -909,9 +909,6 @@ bool select_dest_dir(file_handle* initial, char* selection)
 				refresh=1;
 			}
 		}
-		if(padsStickY() < -16 || padsStickY() > 16) {
-			usleep(50000 - abs(padsStickY()*256));
-		}
 		if(padsButtonsHeld() & BUTTON_X)	{
 			strcpy(selection, curDir.name);
 			break;
@@ -919,6 +916,9 @@ bool select_dest_dir(file_handle* initial, char* selection)
 		if(padsButtonsHeld() & BUTTON_B)	{
 			cancelled = true;
 			break;
+		}
+		if(padsStickY() < -16 || padsStickY() > 16) {
+			usleep(50000 - abs(padsStickY()*256));
 		}
 		while (!(!(padsButtonsHeld() & BUTTON_X) && !(padsButtonsHeld() & (BUTTON_X|BUTTON_A|BUTTON_B|BUTTON_UP|BUTTON_DOWN))))
 			{ VIDEO_WaitVSync (); }
@@ -931,13 +931,14 @@ bool select_dest_dir(file_handle* initial, char* selection)
 	return cancelled;
 }
 
-void select_timezone(char* selection)
+bool select_timezone(char* selection)
 {
 	char timezone[32];
 	struct TZData *tzdata = &TZData;
 	strcpy(timezone, tzdata->name);
 	int i = 0, j = 0, max = 0, num_files = tzdata->count, idx = 0;
 	
+	bool cancelled = false;
 	int fileListBase = 90;
 	int scrollBarHeight = (FILES_PER_PAGE*40);
 	int scrollBarTabHeight = (int)((float)scrollBarHeight/(float)num_files);
@@ -970,7 +971,10 @@ void select_timezone(char* selection)
 				break;
 			}
 		}
-		if((padsButtonsHeld() & BUTTON_B))	break;
+		if((padsButtonsHeld() & BUTTON_B))	{
+			cancelled = true;
+			break;
+		}
 		if(padsStickY() < -16 || padsStickY() > 16) {
 			usleep(50000 - abs(padsStickY()*256));
 		}
@@ -978,6 +982,7 @@ void select_timezone(char* selection)
 			{ VIDEO_WaitVSync (); }
 	}
 	DrawDispose(container);
+	return cancelled;
 }
 
 // Alt DOL sorting/selecting code
@@ -1626,7 +1631,7 @@ bool manage_file() {
 		char *parentPath = calloc(1, sizeof(curFile.name));
 		getParentPath(&curFile.name[0], parentPath);
 		strcpy(nameBuffer, getRelativeName(&curFile.name[0]));
-		DrawGetTextEntry(ENTRYMODE_NUMERIC|ENTRYMODE_ALPHA|ENTRYMODE_FILE, "Rename", nameBuffer, sizeof(curFile.name)-(strlen(parentPath)+1));
+		DrawGetTextEntry(ENTRYMODE_FILE, "Rename", nameBuffer, sizeof(curFile.name)-(strlen(parentPath)+1));
 		concat_path(txtbuffer, parentPath, nameBuffer);
 		bool modified = (strcmp(&curFile.name[0], txtbuffer) != 0) && strlen(nameBuffer) > 0;
 		if(modified) {

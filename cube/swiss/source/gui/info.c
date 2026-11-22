@@ -50,7 +50,7 @@ const char* getDeviceInfoString(u32 location) {
 		}
 	}
 	else if(device == &__device_aram) {
-		formatBytes(topStr, __io_aram.numberOfSectors * __io_aram.bytesPerSector, 0, false);
+		formatBytes(topStr, AR_GetExpansionSize(), 0, false);
 		strcat(topStr, " ");
 		strcat(topStr, device->hwName);
 	}
@@ -276,46 +276,46 @@ uiDrawObj_t * info_draw_page(int page_num) {
 	else if(page_num == 2) {
 		DrawAddChild(container, DrawLabel(30, 67, "Hotplug Info (3/5):"));
 		DrawAddChild(container, DrawStyledLabel(640/2, 90, (char*)"SLOT-A", 0.65f, ALIGN_CENTER, defaultColor));
-		const char* getSlotAString() {
+		const char* getSlotAString(const char*) {
 			return getExiTypeByLocation(LOC_MEMCARD_SLOT_A);
 		}
 		DrawAddChild(container, DrawDynamicLabel(640/2, 106, getSlotAString, 0.75f, ALIGN_CENTER, defaultColor));
 		DrawAddChild(container, DrawStyledLabel(640/2, 130, (char*)"SLOT-B", 0.65f, ALIGN_CENTER, defaultColor));
-		const char* getSlotBString() {
+		const char* getSlotBString(const char*) {
 			return getExiTypeByLocation(LOC_MEMCARD_SLOT_B);
 		}
 		DrawAddChild(container, DrawDynamicLabel(640/2, 146, getSlotBString, 0.75f, ALIGN_CENTER, defaultColor));
 		DrawAddChild(container, DrawStyledLabel(640/2, 170, (char*)"CONTROLLER SOCKET 1", 0.65f, ALIGN_CENTER, defaultColor));
-		const char* getControllerSocket1String() {
+		const char* getControllerSocket1String(const char*) {
 			return getControllerSocketString(PAD_CHAN0);
 		}
 		DrawAddChild(container, DrawDynamicLabel(640/2, 186, getControllerSocket1String, 0.75f, ALIGN_CENTER, defaultColor));
 		DrawAddChild(container, DrawStyledLabel(640/2, 210, (char*)"CONTROLLER SOCKET 2", 0.65f, ALIGN_CENTER, defaultColor));
-		const char* getControllerSocket2String() {
+		const char* getControllerSocket2String(const char*) {
 			return getControllerSocketString(PAD_CHAN1);
 		}
 		DrawAddChild(container, DrawDynamicLabel(640/2, 226, getControllerSocket2String, 0.75f, ALIGN_CENTER, defaultColor));
 		DrawAddChild(container, DrawStyledLabel(640/2, 250, (char*)"CONTROLLER SOCKET 3", 0.65f, ALIGN_CENTER, defaultColor));
-		const char* getControllerSocket3String() {
+		const char* getControllerSocket3String(const char*) {
 			return getControllerSocketString(PAD_CHAN2);
 		}
 		DrawAddChild(container, DrawDynamicLabel(640/2, 266, getControllerSocket3String, 0.75f, ALIGN_CENTER, defaultColor));
 		DrawAddChild(container, DrawStyledLabel(640/2, 290, (char*)"CONTROLLER SOCKET 4", 0.65f, ALIGN_CENTER, defaultColor));
-		const char* getControllerSocket4String() {
+		const char* getControllerSocket4String(const char*) {
 			return getControllerSocketString(PAD_CHAN3);
 		}
 		DrawAddChild(container, DrawDynamicLabel(640/2, 306, getControllerSocket4String, 0.75f, ALIGN_CENTER, defaultColor));
 		DrawAddChild(container, DrawStyledLabel(640/2, 330, (char*)"PROGRESSIVE VIDEO", 0.65f, ALIGN_CENTER, defaultColor));
-		const char* getProgressiveVideoString() {
+		const char* getProgressiveVideoString(const char*) {
 			return getDTVStatus() ? getRawDTVStatus() ? "Enabled" : "Forced" : "Disabled";
 		}
 		DrawAddChild(container, DrawDynamicLabel(640/2, 346, getProgressiveVideoString, 0.75f, ALIGN_CENTER, defaultColor));
 	}
 	else if(page_num == 3) {
 		DrawAddChild(container, DrawLabel(30, 67, "Version Info (4/5):"));
-		DrawAddChild(container, DrawStyledLabel(640/2, 115, "Swiss version 0.6", 1.0f, ALIGN_CENTER, defaultColor));
-		DrawAddChild(container, DrawStyledLabel(640/2, 140, "by emu_kidid & Extrems, 2026", 0.75f, ALIGN_CENTER, defaultColor));
-		sprintf(topStr, "Commit %s; Revision %s", GIT_COMMIT, GIT_REVISION);
+		DrawAddChild(container, DrawStyledLabel(640/2, 115, "Swiss version " GIT_VERSION, 1.0f, ALIGN_CENTER, defaultColor));
+		DrawAddChild(container, DrawStyledLabel(640/2, 140, "by emu_kidid & Extrems, 2011\226" GIT_COPYRIGHT, 0.75f, ALIGN_CENTER, defaultColor));
+		sprintf(topStr, "Commit %s; Revision %i", GIT_COMMIT, GIT_REVISION);
 		DrawAddChild(container, DrawStyledLabel(640/2, 165, topStr, 0.75f, ALIGN_CENTER, defaultColor));
 		DrawAddChild(container, DrawStyledLabel(640/2, 190, "Built with " _V_STRING, 0.64f, ALIGN_CENTER, defaultColor));
 		DrawAddChild(container, DrawStyledLabel(640/2, 240, "Source/Updates/Issues", 0.75f, ALIGN_CENTER, defaultColor));

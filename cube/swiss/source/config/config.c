@@ -1,5 +1,6 @@
 /* Changed 2026-10-29 (fork): saves and loads the Screen, Picture Width, Overscan, Menu Music and Menu Sounds settings. */
 #include <argz.h>
+#include <envlock.h>
 #include <langinfo.h>
 #include <stdcountof.h>
 #include <stdio.h>
@@ -52,7 +53,6 @@
 //No Disc Mode=Yes
 //Force Widescreen=Yes
 
-#define SWISS_SETTINGS_FILENAME_LEGACY "swiss.ini"
 #define SWISS_SETTINGS_FILENAME "global.ini"
 #define SWISS_RECENTLIST_FILENAME "recent.ini"
 #define SWISS_BASE_DIR "swiss"
@@ -401,301 +401,6 @@ void config_defaults(ConfigEntry *entry) {
 			break;
 		}
 	}
-}
-
-// TODO kill this off in one major version from now. Don't add new settings to it.
-void config_parse_legacy(char *configData, void (*progress_indicator)(char*, int, int)) {
-	ConfigEntry configEntries[2048]; // That's a lot of Games!
-	int configEntriesCount = 0;
-	// Parse each entry and put it into our array
-	char *line, *linectx = NULL;
-	int first = 1;
-	bool defaultPassed = false;
-	line = strtok_r( configData, "\r\n", &linectx );
-	while( line != NULL ) {
-		//print_debug("Line [%s]\n", line);
-		if(line[0] != '#') {
-			// Is this line a new game entry?
-			char *name, *value = NULL;
-			name = strtok_r(line, "=", &value);
-			
-			if(value != NULL) {
-				//print_debug("Name [%s] Value [%s]\n", name, value);
-
-				if(!strcmp("ID", name)) {
-					defaultPassed = true;
-					if(!first) {
-						configEntriesCount++;
-					}
-					strncpy(configEntries[configEntriesCount].game_id, value, 4);
-					first = 0;
-					// Fill this entry with defaults incase some values are missing..
-					config_defaults(&configEntries[configEntriesCount]);
-				}
-				else if(!strcmp("Name", name)) {
-					strncpy(configEntries[configEntriesCount].game_name, value, 64);
-				}
-				else if(!strcmp("Comment", name)) {
-					strncpy(configEntries[configEntriesCount].comment, value, 128);
-				}
-				else if(!strcmp("Status", name)) {
-					strncpy(configEntries[configEntriesCount].status, value, 32);
-				}
-				else if(!strcmp("Force Video Mode", name)) {
-					int *ptr = !defaultPassed ? &swissSettings.gameVMode : &configEntries[configEntriesCount].gameVMode;
-					for(int i = 0; i < 15; i++) {
-						if(!strcmp(gameVModeStr[i], value)) {
-							*ptr = i;
-							break;
-						}
-					}
-				}
-				else if(!strcmp("Force Horizontal Scale", name)) {
-					int *ptr = !defaultPassed ? &swissSettings.forceHScale : &configEntries[configEntriesCount].forceHScale;
-					for(int i = 0; i < 9; i++) {
-						if(!strcmp(forceHScaleStr[i], value)) {
-							*ptr = i;
-							break;
-						}
-					}
-				}
-				else if(!strcmp("Force Vertical Filter", name)) {
-					int *ptr = !defaultPassed ? &swissSettings.forceVFilter : &configEntries[configEntriesCount].forceVFilter;
-					for(int i = 0; i < 4; i++) {
-						if(!strcmp(forceVFilterStr[i], value)) {
-							*ptr = i;
-							break;
-						}
-					}
-				}
-				else if(!strcmp("Disable Alpha Dithering", name)) {
-					if(defaultPassed)
-						configEntries[configEntriesCount].disableDithering = !strcmp("Yes", value);
-					else
-						swissSettings.disableDithering = !strcmp("Yes", value);
-				}
-				else if(!strcmp("Force Anisotropic Filter", name)) {
-					if(defaultPassed)
-						configEntries[configEntriesCount].forceAnisotropy = !strcmp("Yes", value);
-					else
-						swissSettings.forceAnisotropy = !strcmp("Yes", value);
-				}
-				else if(!strcmp("Force Widescreen", name)) {
-					int *ptr = !defaultPassed ? &swissSettings.forceWidescreen : &configEntries[configEntriesCount].forceWidescreen;
-					for(int i = 0; i < 3; i++) {
-						if(!strcmp(forceWidescreenStr[i], value)) {
-							*ptr = i;
-							break;
-						}
-					}
-				}
-				else if(!strcmp("Invert Camera Stick", name)) {
-					int *ptr = !defaultPassed ? &swissSettings.invertCStick : &configEntries[configEntriesCount].invertCStick;
-					for(int i = 0; i < 4; i++) {
-						if(!strcmp(invertCStickStr[i], value)) {
-							*ptr = i;
-							break;
-						}
-					}
-				}
-				else if(!strcmp("Emulate Read Speed", name)) {
-					int *ptr = !defaultPassed ? &swissSettings.emulateReadSpeed : &configEntries[configEntriesCount].emulateReadSpeed;
-					for(int i = 0; i < 3; i++) {
-						if(!strcmp(emulateReadSpeedStr[i], value)) {
-							*ptr = i;
-							break;
-						}
-					}
-				}
-				else if(!strcmp("Emulate Memory Card", name)) {
-					swissSettings.emulateMemoryCard = !strcmp("Yes", value);
-				}
-				
-				// Swiss settings
-				else if(!strcmp("SD/IDE Speed", name)) {
-					swissSettings.exiSpeed = !strcmp("32MHz", value);
-				}
-				else if(!strcmp("Swiss Video Mode", name)) {
-					for(int i = 0; i < 9; i++) {
-						if(!strcmp(uiVModeStr[i], value)) {
-							swissSettings.uiVMode = i;
-							break;
-						}
-					}
-				}
-				else if(!strcmp("Swiss Screen", name)) {
-					swissSettings.uiWidescreen = !strcmp(uiWidescreenStr[1], value);
-				}
-				else if(!strcmp("Swiss Picture Width", name)) {
-					swissSettings.uiPictureWidth = !strcmp(uiPictureWidthStr[1], value);
-				}
-				else if(!strcmp("Swiss Overscan", name)) {
-					swissSettings.uiOverscan = atoi(value);
-					if(swissSettings.uiOverscan < 0) swissSettings.uiOverscan = 0;
-					if(swissSettings.uiOverscan > 10) swissSettings.uiOverscan = 10;
-				}
-				else if(!strcmp("Swiss Menu Music", name)) {
-					swissSettings.uiMusicOff = !strcmp("No", value);
-				}
-				else if(!strcmp("Swiss Menu Sounds", name)) {
-					swissSettings.uiSoundsOff = !strcmp("No", value);
-				}
-				else if(!strcmp("Enable Debug", name)) {
-					swissSettings.enableUSBGecko = !strcmp("Yes", value) ? USBGECKO_MEMCARD_SLOT_B : USBGECKO_OFF;
-				}
-				else if(!strcmp("Hide Unknown file types", name)) {
-					swissSettings.hideUnknownFileTypes = !strcmp("Yes", value);
-				}
-				else if(!strcmp("Stop DVD Motor on startup", name)) {
-					swissSettings.stopMotor = !strcmp("Yes", value);
-				}
-				else if(!strcmp("Enable WiiRD debug", name)) {
-					swissSettings.wiirdDebug = !strcmp("Yes", value);
-				}
-				else if(!strcmp("Enable File Management", name)) {
-					swissSettings.enableFileManagement = !strcmp("Yes", value);
-				}
-				else if(!strcmp("Disable Video Patches", name)) {
-					for(int i = 0; i < 3; i++) {
-						if(!strcmp(disableVideoPatchesStr[i], value)) {
-							swissSettings.disableVideoPatches = i;
-							break;
-						}
-					}
-				}
-				else if(!strcmp("Force Video Active", name)) {
-					swissSettings.forceVideoActive = !strcmp("Yes", value);
-				}
-				else if(!strcmp("Force DTV Status", name)) {
-					for(int i = 0; i < 3; i++) {
-						if(!strcmp(forceDTVStatusStr[i], value)) {
-							swissSettings.forceDTVStatus = i;
-							break;
-						}
-					}
-				}
-				else if(!strcmp("SMBUserName", name)) {
-					strlcpy(swissSettings.smbUser, value, sizeof(swissSettings.smbUser));
-				}
-				else if(!strcmp("SMBPassword", name)) {
-					strlcpy(swissSettings.smbPassword, value, sizeof(swissSettings.smbPassword));
-				}
-				else if(!strcmp("SMBShareName", name)) {
-					strlcpy(swissSettings.smbShare, value, sizeof(swissSettings.smbShare));
-				}
-				else if(!strcmp("SMBHostIP", name)) {
-					strlcpy(swissSettings.smbServerIp, value, sizeof(swissSettings.smbServerIp));
-				}
-				else if(!strcmp("AutoCheats", name)) {
-					swissSettings.autoCheats = !strcmp("Yes", value);
-				}
-				else if(!strcmp("InitNetwork", name)) {
-					swissSettings.initNetworkAtStart = !strcmp("Yes", value);
-				}
-				else if(!strcmp("IGRType", name)) {
-					for(int i = 0; i < 3; i++) {
-						if(!strcmp(igrTypeStr[i], value)) {
-							swissSettings.igrType = i;
-							break;
-						}
-					}
-				}
-				else if(!strcmp("AVECompat", name)) {
-					for(int i = 0; i < AVE_COMPAT_MAX; i++) {
-						if(!strcmp(aveCompatStr[i], value)) {
-							swissSettings.aveCompat = i;
-							break;
-						}
-					}
-				}
-				else if(!strcmp("FileBrowserType", name)) {
-					for(int i = 0; i < BROWSER_MAX; i++) {
-						if(!strcmp(fileBrowserTypeStr[i], value)) {
-							swissSettings.fileBrowserType = i;
-							break;
-						}
-					}
-				}
-				else if(!strcmp("BS2Boot", name)) {
-					for(int i = 0; i < 4; i++) {
-						if(!strcmp(bs2BootStr[i], value)) {
-							swissSettings.bs2Boot = i;
-							break;
-						}
-					}
-				}
-				else if(!strcmp("FTPUserName", name)) {
-					strlcpy(swissSettings.ftpUserName, value, sizeof(swissSettings.ftpUserName));
-				}
-				else if(!strcmp("FTPPassword", name)) {
-					strlcpy(swissSettings.ftpPassword, value, sizeof(swissSettings.ftpPassword));
-				}
-				else if(!strcmp("FTPHostIP", name)) {
-					strlcpy(swissSettings.ftpHostIp, value, sizeof(swissSettings.ftpHostIp));
-				}
-				else if(!strcmp("FTPPort", name)) {
-					swissSettings.ftpPort = atoi(value);
-				}
-				else if(!strcmp("FTPUsePasv", name)) {
-					swissSettings.ftpUsePasv = !strcmp("Yes", value);
-				}
-				else if(!strcmp("FSPHostIP", name)) {
-					strlcpy(swissSettings.fspHostIp, value, sizeof(swissSettings.fspHostIp));
-				}
-				else if(!strcmp("FSPPort", name)) {
-					swissSettings.fspPort = atoi(value);
-				}
-				else if(!strcmp("FSPPassword", name)) {
-					strlcpy(swissSettings.fspPassword, value, sizeof(swissSettings.fspPassword));
-				}
-				else if(!strcmp("ShowHiddenFiles", name)) {
-					swissSettings.showHiddenFiles = !strcmp("Yes", value);
-				}
-				else if(!strcmp("RecentListLevel", name)) {
-					for(int i = 0; i < 3; i++) {
-						if(!strcmp(recentListLevelStr[i], value)) {
-							swissSettings.recentListLevel = i;
-							break;
-						}
-					}
-				}
-				else if(!strcmp("GCLoaderTopVersion", name)) {
-					strlcpy(swissSettings.gcloaderTopVersion, value, sizeof(swissSettings.gcloaderTopVersion));
-				}
-				else if(!strcmp("Autoload", name)) {
-					strlcpy(swissSettings.autoload, value, sizeof(swissSettings.autoload));
-				}
-				else if(!strncmp("Recent_", name, strlen("Recent_"))) {
-					int recent_slot = atoi(name+strlen("Recent_"));
-					if(recent_slot >= 0 && recent_slot < RECENT_MAX) {
-						//print_debug("found recent num %i [%s]\n", recent_slot, value);
-						strlcpy(swissSettings.recent[recent_slot], value, PATHNAME_MAX);
-					}
-				}
-			}
-		}
-		// And round we go again
-		line = strtok_r( NULL, "\r\n", &linectx);
-	}
-
-	if(configEntriesCount > 0 || !first) {
-		configEntriesCount++;
-		config_defaults(&configEntries[configEntriesCount]);
-	}
-	 print_debug("Found %i entries in the (legacy) config file\n",configEntriesCount);
-	 
-	 // Write out to individual files.
-	 int i;
-	 for(i = 0; i < configEntriesCount; i++) {
-		 progress_indicator("Migrating settings to new format.", 1, (int)(((float)i / (float)configEntriesCount) * 100));
-		 config_update_game(&configEntries[i], &configEntries[configEntriesCount], false);
-	 }
-	 // Write out a new swiss.ini
-	 config_update_global(false);
-	 // Write out new recent.ini
-	 config_update_recent(false);
-	 // Kill off the old swiss.ini
-	 config_file_delete(SWISS_SETTINGS_FILENAME_LEGACY);
 }
 
 void config_parse_global(char *configData) {
@@ -1361,11 +1066,11 @@ void config_find(ConfigEntry *entry) {
 	Initialises the configuration file
 	Returns 1 on successful file open, 0 otherwise
 */
-int config_init(void (*progress_indicator)(char*, int, int)) {
+int config_init(void (*progress_indicator)(char*, int)) {
 	int res = 0;
-	progress_indicator("Loading settings", 1, -2);
+	progress_indicator("Loading settings", 1);
 	if(!config_set_device()) {
-		progress_indicator(NULL, 0, 0);
+		progress_indicator(NULL, 0);
 		return res;
 	}
 	
@@ -1374,18 +1079,9 @@ int config_init(void (*progress_indicator)(char*, int, int)) {
 	ensure_path(DEVICE_CONFIG, SWISS_SETTINGS_DIR, NULL, false);
 	ensure_path(DEVICE_CONFIG, SWISS_GAME_SETTINGS_DIR, NULL, false);
 	
-	// Read config (legacy /swiss.ini format)
-	char* configData = config_file_read(SWISS_SETTINGS_FILENAME_LEGACY);
-	if(configData != NULL) {
-		progress_indicator(NULL, 0, 0);
-		progress_indicator("Migrating settings to new format.", 1, -1);
-		config_parse_legacy(configData, progress_indicator);
-		free(configData);
-	}
-	
 	// Read config (new format)
 	concat_path(txtbuffer, SWISS_SETTINGS_DIR, SWISS_SETTINGS_FILENAME);
-	configData = config_file_read(txtbuffer);
+	char *configData = config_file_read(txtbuffer);
 	if(configData != NULL) {
 		config_parse_global(configData);
 		free(configData);
@@ -1395,13 +1091,13 @@ int config_init(void (*progress_indicator)(char*, int, int)) {
 	// Read the recent list if enabled
 	if(swissSettings.recentListLevel > 0) {
 		concat_path(txtbuffer, SWISS_SETTINGS_DIR, SWISS_RECENTLIST_FILENAME);
-		configData = config_file_read(txtbuffer);
+		char *configData = config_file_read(txtbuffer);
 		if(configData != NULL) {
 			config_parse_recent(configData);
 			free(configData);
 		}
 	}
-	progress_indicator(NULL, 0, 0);
+	progress_indicator(NULL, 0);
 	config_unset_device();
 	return res;
 }
@@ -1442,6 +1138,22 @@ void config_init_environ() {
 	if(value != NULL) {
 		swissSettings.hasFlippyDrive = !!atoi(value);
 	}
+	value = getenv("SMB_PASSWORD");
+	if(value != NULL) {
+		strlcpy(swissSettings.smbPassword, value, sizeof(swissSettings.smbPassword));
+	}
+	value = getenv("SMB_SERVER");
+	if(value != NULL) {
+		strlcpy(swissSettings.smbServerIp, value, sizeof(swissSettings.smbServerIp));
+	}
+	value = getenv("SMB_SHARE");
+	if(value != NULL) {
+		strlcpy(swissSettings.smbShare, value, sizeof(swissSettings.smbShare));
+	}
+	value = getenv("SMB_USER");
+	if(value != NULL) {
+		strlcpy(swissSettings.smbUser, value, sizeof(swissSettings.smbUser));
+	}
 	value = getenv("USBGECKO_CHANNEL");
 	if(value != NULL) {
 		swissSettings.enableUSBGecko = USBGECKO_MEMCARD_SLOT_A + atoi(value);
@@ -1457,15 +1169,31 @@ void config_init_environ() {
 }
 
 void config_update_environ() {
+	__env_lock(NULL);
+	
 	setenv("AVE", aveCompatStr[swissSettings.aveCompat], 1);
 	sprintf(txtbuffer, "LANG=%s.%s", sramLanguageEnvStr[swissSettings.sramLanguage], nl_langinfo(CODESET));
 	putenv(txtbuffer);
 	
-	const char *tzenv = get_timezone(swissSettings.timeZone);
-	if(tzenv != NULL)
-		setenv("TZ", tzenv, 1);
+	if(strlen(swissSettings.smbPassword))
+		setenv("SMB_PASSWORD", swissSettings.smbPassword, 1);
 	else
-		unsetenv("TZ");
+		unsetenv("SMB_PASSWORD");
+	
+	if(strlen(swissSettings.smbServerIp))
+		setenv("SMB_SERVER", swissSettings.smbServerIp, 1);
+	else
+		unsetenv("SMB_SERVER");
+	
+	if(strlen(swissSettings.smbShare))
+		setenv("SMB_SHARE", swissSettings.smbShare, 1);
+	else
+		unsetenv("SMB_SHARE");
+	
+	if(strlen(swissSettings.smbUser))
+		setenv("SMB_USER", swissSettings.smbUser, 1);
+	else
+		unsetenv("SMB_USER");
 	
 	if(swissSettings.enableUSBGecko) {
 		sprintf(txtbuffer, "USBGECKO_CHANNEL=%i", swissSettings.enableUSBGecko - USBGECKO_MEMCARD_SLOT_A);
@@ -1486,7 +1214,8 @@ void config_update_environ() {
 	
 	__PADDisableRecalibration(swissSettings.disableRecalibration);
 	__PADDisableRumble(swissSettings.disableRumble);
-	__SYS_InitTime();
+	
+	__env_unlock(NULL);
 }
 
 SwissSettings backup;

@@ -72,6 +72,7 @@ static const struct {
 	{ "apploader.img", /* 2001/09/08       */  106432, 0x1A25A025A07B8230 },
 	{ "apploader.img", /* 2001/09/08       */  106432, 0x1B0D02775A7CF43E },
 	{ "apploader.img", /* 2001/09/08       */  106432, 0x2BB9CDBBDFD93ED8 },
+	{ "apploader.img", /* 2001/09/08       */  106432, 0x2E6E17CA3BCD59B0 },
 	{ "apploader.img", /* 2001/09/08       */  106432, 0x2F3492A6A93665D9 },
 	{ "apploader.img", /* 2001/09/08       */  106432, 0x3586E84FB8FAAE1E },
 	{ "apploader.img", /* 2001/09/08       */  106432, 0x379837963CA97794 },
@@ -151,6 +152,7 @@ static const struct {
 	{ "apploader.img", /* 2002/03/28       */  113536, 0x5D2040FE89C64FBC },
 	{ "apploader.img", /* 2002/04/10       */  113536, 0xBBF3FF7C1A14AA59 },
 	{ "apploader.img", /* 2002/04/10       */  113536, 0xDC2A278D4F92A68C },
+	{ "apploader.img", /* 2002/04/12       */   78144, 0xD378B8C3792E69E5 },
 	{ "apploader.img", /* 2002/09/05       */  116512, 0x3712B0FF29B57C84 },
 	{ "apploader.img", /* 2002/09/05       */  116512, 0x42C07D59E1227D14 },
 	{ "apploader.img", /* 2002/09/05       */  116512, 0x4E907A28728D421A },
@@ -189,7 +191,7 @@ static const struct {
 	{ "apploader.img", /* 2024/09/17       */  113536, 0x623687789597750B },
 	{ "apploader.img", /* 2025/07/10       */  113536, 0xED22F838A52EABC5 },
 	{ "apploader.img", /* 2026/05/11       */  116512, 0xCBDE805EC9BF9E55 },
-#define NKIT_FIRM_COUNT (FIRM_COUNT + 131)
+#define NKIT_FIRM_COUNT (FIRM_COUNT + 133)
 	{ "240p Test Suite (World) (v1.04) (Unl).dol",                  2301384, 0x71BCDBA149B3AAAF },
 	{ "240p Test Suite (World) (v1.06) (Unl).dol",                   930560, 0x7EB7DDDAF5105457 },
 	{ "240p Test Suite (World) (v1.07) (Unl).dol",                   932032, 0x4DAB8540272CCBD5 },
@@ -1517,6 +1519,7 @@ static const struct {
 	{{ "GNHE5d\x00\x00" }, false, 0x5A, 0xCCBB, 0x1F756DAD, 0x18600C6BC8C6562B,    1417216, +1458561024, {      94248,       +4056, 6496, 0x6D95 }, "Action Replay Ultimative Cheatcodes für Final Fantasy: Crystal Chronicles" },
 	{{ "GNHE5d\x00\x00" }, false, 0x66, 0xCCBB, 0x55D7EDD1, 0x28A5FFBE9A173388,     989184, +1458989056, {      94248,       +4056, 6496, 0xE787 }, "Ultimate Cheats für Splinter Cell" },
 	{{ "GNHE5d\x00\x00" }, false, 0x68, 0xCCBB, 0xBF7B7C5A, 0x421F5299A43CCD74,    1189888, +1458788352, {      94248,       +4056, 6496, 0xD19A }, "Power Link Game Enhancer Disc" },
+	{{ "GNHE5d\x00\x00" }, false, 0x6B, 0xCCBB, 0x46E36A62, 0x800E9345B896A314,    3393536, +1456584704, {      94248,       +4056, 6496, 0x7AAF }, "Action Replay Max: Evo Edition" },
 	{{ "GNHE5d\x00\x00" }, false, 0x73, 0xCCBB, 0x4B9B91E6, 0xAEC6721D4E3AB041,     866304, +1459111936, {      94248,       +4056, 6496, 0x71CD }, "Cube CD 15 (34)" },
 	{{ "GNHE5d\x00\x00" }, false, 0x7B, 0xCCBB, 0xCC3182C3, 0x009AEBA340070CC2,   11837440, +1448140800, {      94248,       +4056, 6496, 0xCC3B }, "Max Play" },
 	{{ "GNHE5d\x00\x00" }, false, 0x7C, 0xCCBB, 0x26649910, 0x76B7CDED51201288,    2185216, +1457793024, {      94248,       +4056, 6496, 0xCD3A }, "Karat GC-you Pro Action Replay PAR GC-you" },
@@ -2291,7 +2294,7 @@ static const struct {
 	{{ "UGPP01\x00\x01" }, false, 0x2A, 0x6D4F, 0x5ECD9681, 0x4E9244DEFB94F10C,    5079040, +1454899200, {    2317764,       +8764, 8096, 0x8972 }, "Game Boy Player Start-Up Disc" },
 	{{ "UGPP01\x00\x02" }, false, 0x3A, 0xCA50, 0x1E26380C, 0x483B4CE794041533,    5079040, +1454899200, {    2317764,       +8764, 8096, 0x8972 }, "Game Boy Player Start-Up Disc" },
 	{{ "XXXXXX\x00\x01" }, false, 0x83, 0x7056, 0x5995AC59, 0x5CBC3D9F00D75112, 1287913472,  +172064768, {         ~0,          +0,    0, 0xFFFF }, "LEGO Super Soccer Adventure" },
-#define REDUMP_COUNT (2021)
+#define REDUMP_COUNT (2022)
 	{{"00\0E01\x00\x00" }, false, 0x8B, 0x42A2, 0x499CF1AB, 0xC1BAC83BFBED3EDB,   31170560, +1428807680, {    7795364,      +23900, 6496, 0xBBEA }, "Nintendo Developer Demo" },
 	{{"00\0E01\x00\x00" }, false, 0xD9, 0x21CF, 0xBF114CB3, 0xC1BAC83BFBED3EDB,   31170560, +1428807680, {    7795364,      +23900, 6496, 0xBBEA }, "Nintendo Developer Demo" },
 	{{ "060J01\x00\x00" }, true,  0x7E, 0x27AC, 0x94C088DF, 0x55221BF909AB54CC,  171485184, +1288493056, {     238648, +1288483336, 6496, 0xFD76 }, "Diag Ver 3.1.1" },
@@ -2398,8 +2401,10 @@ static const struct {
 	{{ "GFEE01\x00\x00" }, false, 0x4A, 0x4275, 0x1661430C, 0x316050A7421877E3, 1300903936,   +93407232, {  669183468,   +15798804, 6496, 0xAD7F }, "Path of Radiance: Reverse Recruitment Ultimate" },
 	{{ "GFEJ01\x00\x00" }, false, 0x9B, 0xFC08, 0xE97ACE52, 0x8C16FBB32540FEAC, 1290264576,  +169713664, {  660224316,  +165844676, 6496, 0x4D38 }, "Fire Emblem: Souen no Kiseki" },
 	{{ "GFTP01\x00\x00" }, false, 0xCB, 0x3F77, 0x963DEB2E, 0x7EF65CF2B33925E9, 1336121344,  +123856896, {    2083652,  +123826684, 8096, 0x9AC5 }, "Mario Golf: Toadstool Tour" },
+	{{ "GGFJ01\x00\x00" }, false, 0x1D, 0x5115, 0x234B4768, 0x5541AEF3195D1742, 1256243200,  +203735040, { 1256235808,  +203735936, 6496, 0xB632 }, "Giftpia" },
 	{{ "GGFJ01\x00\x00" }, false, 0x65, 0x5115, 0x07144E89, 0x06255BCF69575FF2, 1256243200,  +203735040, { 1256235816,  +203735928, 6496, 0xB632 }, "Giftpia" },
 	{{ "GGFJ01\x00\x00" }, false, 0x6E, 0x5115, 0x7B462C42, 0x5997CC24E258736C, 1256243200,  +203735040, { 1256235816,  +203735928, 6496, 0xB632 }, "Giftpia" },
+	{{ "GGFJ01\x00\x00" }, false, 0x90, 0x5115, 0xA6666738, 0x5541AEF3195D1742, 1256243200,  +203735040, { 1256235816,  +203735928, 6496, 0xB632 }, "Giftpia" },
 	{{ "GGFJ01\x00\x00" }, false, 0xD2, 0x5115, 0x0E5E9913, 0x80F190A5C647FBD9, 1256243200,  +203735040, { 1256235816,  +203735928, 6496, 0xB632 }, "Giftpia" },
 	{{ "GGFJ01\x00\x00" }, false, 0xEA, 0x5115, 0x8B503AA1, 0xDA35D2EAA844A999, 1256243200,  +203735040, { 1256235816,  +203735928, 6496, 0xB632 }, "Giftpia" },
 	{{ "GGSEA4\x10\x00" }, false, 0x16, 0xCD03, 0xD1B33770, 0xBB75D2E06575ECBC, 1316773888,  +143204352, {  596774724,      +32956, 6496, 0x215E }, "Metal Gear Solid: The Twin Snakes" },
@@ -2468,6 +2473,7 @@ static const struct {
 	{{ "GMUP5D\x00\x00" }, false, 0x80, 0xEE0B, 0xD442A6BF, 0x436DC9BED493D5DE, 1425692672,   +34285568, {    6644012,    +5580500, 6496, 0x093D }, "Dr. Muto" },
 	{{ "GNHE5d\x00\x00" }, false, 0x94, 0xCCBB, 0xE7F301B7, 0x111E626AC7CDE6B5,     428032, +1459550208, {      94248,       +4056, 6496, 0x5AE1 }, "Action Replay Ultimate Codes for Use with Enter the Matrix" },
 	{{ "GP5P01\x00\x00" }, false, 0x3D, 0xFBF1, 0x9DC1BB2A, 0xC5CD32D7C41AAE3D,  922845184,  +537133056, {   14902032,      +41916, 8096, 0x3D31 }, "Mario Party 5" },
+	{{ "GPIE01\x00\x01" }, false, 0x13, 0x9355, 0xAB7C0C9F, 0x7CC6284609825763,  664678400,  +795299840, {  638193140,  +795300820, 6496, 0x880A }, "Pikmin" },
 	{{ "GPNE08\x00\x00" }, false, 0x44, 0xA6AC, 0xD42D1079, 0x43947E5CABB597D0,  689250304,  +770727936, {  492787200,  +770729280, 6496, 0x5AB7 }, "P.N. 03" },
 	{{ "GPZE01\x00\x00" }, false, 0x3E, 0xF60D, 0x0F13C224, 0x1C69883B549A7E38,  144412672, +1315565568, {   33273940,      +38004, 6496, 0x59D7 }, "Nintendo Puzzle Collection" },
 	{{ "GPZJ01\x00\x00" }, false, 0x49, 0x686E, 0xB6FEB467, 0x3F854F54EDCC3480,  144412672, +1315565568, {   33273940,      +38004, 6496, 0x59D7 }, "Nintendo Puzzle Collection" },
@@ -2543,7 +2549,7 @@ static const struct {
 	{{ "SG4JDA\x00\x00" }, true,  0x52, 0xF019, 0x4BB4830A, 0x3645CAE26589C220, 1272594432,  +187383808, { 1272587604,  +187384140, 6496, 0x015D }, "Naruto: Clash of Ninja 4" },
 	{{ "SG4JDA\x00\x00" }, true,  0x9D, 0xB3B3, 0x424A4760, 0x38394EDF8E58393A, 1261602816,  +198375424, { 1261594344,  +198377400, 6496, 0x015D }, "Naruto: Clash of Ninja 4" },
 	{{ "TESTNA\x00\x00" }, false, 0xD2, 0x0C28, 0x6254FB97, 0xAA2E5EDD0EF81992,   26834944,       -1658, {         ~0,          +0,    0, 0xFFFF }, "Dodger Demo" },
-#define VALID_GCM_COUNT (REDUMP_COUNT + 251)
+#define VALID_GCM_COUNT (REDUMP_COUNT + 254)
 	{{ "000801\x00\x00" }, true,  0x72, 0xB329, 0x0E0756FC, 0x2541648547EA120F, 1354366976,  +105611264, {         ~0,          +0,    0, 0xFFFF }, "Diag 2001/03/29" },
 	{{ "101E01\x00\x05" }, true,  0x88, 0xB6FD, 0x4BB518CD, 0x27CFAD706924A030, 1435949056,   +24029184, {         ~0,          +0,    0, 0xFFFF }, "Hontai Kensa Disc DOL-USA" },
 	{{ "101E01\x00\x05" }, true,  0xC6, 0xB6FD, 0x4BB518CD, 0x27CFAD706924A030, 1435949056,   +24029184, {         ~0,          +0,    0, 0xFFFF }, "Hontai Kensa Disc DOL-USA" },
@@ -2582,9 +2588,11 @@ static const struct {
 	{{ "GC4EBN\x00\x00" }, false, 0x7A, 0xC0A7, 0xF665334C, 0xD4AD315EFE4AD06F, 1460013056,      -34816, {   90472448,      -32768, 6496, 0xE4F4 }, "Future GPX Cyber Formula: Road to the Evolution" },
 	{{ "GDXPA4\x00\x00" }, false, 0x62, 0xDD62, 0x1700CAE2, 0x9B30814C59362FDF,  573855744,  +886122496, {  573802548,  +886123820, 8096, 0x6909 }, "Disney Sports: Skateboarding" },
 	{{ "GGFJ01\x00\x00" }, false, 0x10, 0x5115, 0x0E5E9913, 0x80F190A5C647FBD9, 1256243200,  +203735040, { 1256235816,  +203735928, 6496, 0xB632 }, "Giftpia" },
+	{{ "GGFJ01\x00\x00" }, false, 0x68, 0x5115, 0x234B4768, 0x5541AEF3195D1742, 1256243200,  +203735040, { 1256235808,  +203735936, 6496, 0xB632 }, "Giftpia" },
 	{{ "GGFJ01\x00\x00" }, false, 0xA7, 0x5115, 0x7B462C42, 0x5997CC24E258736C, 1256243200,  +203735040, { 1256235816,  +203735928, 6496, 0xB632 }, "Giftpia" },
 	{{ "GGFJ01\x00\x00" }, false, 0xBD, 0x5115, 0x8B503AA1, 0xDA35D2EAA844A999, 1256243200,  +203735040, { 1256235816,  +203735928, 6496, 0xB632 }, "Giftpia" },
 	{{ "GGFJ01\x00\x00" }, false, 0xCD, 0x5115, 0x07144E89, 0x06255BCF69575FF2, 1256243200,  +203735040, { 1256235816,  +203735928, 6496, 0xB632 }, "Giftpia" },
+	{{ "GGFJ01\x00\x00" }, false, 0xD2, 0x5115, 0xA6666738, 0x5541AEF3195D1742, 1256243200,  +203735040, { 1256235816,  +203735928, 6496, 0xB632 }, "Giftpia" },
 	{{ "GHEE91\x00\x01" }, false, 0x10, 0x4CAD, 0xA5391CA0, 0xD0D84B5A3961CAD8, 1459980288,       -2048, { 1235271692,         -52, 6496, 0x94C1 }, "Homeland" },
 	{{ "GHEE91\x00\x01" }, false, 0x23, 0x4CAD, 0xA5391CA0, 0xD0D84B5A3961CAD8, 1459980288,       -2048, { 1235271648,          -8, 6496, 0x94C1 }, "Homeland" },
 	{{ "GIAP7D\x00\x00" }, false, 0x84, 0x4B59, 0x85B0AE66, 0x98AF060B6E4E1EFC, 1459746816,     +231424, { 1459738280,     +231864, 8096, 0x9E52 }, "Ice Age 2: The Meltdown" },
@@ -2624,7 +2632,7 @@ static const struct {
 	{{ "RELSAB\x00\x00" }, false, 0xAC, 0xBA9E, 0x1D74AD4A, 0x1A5F0EA47A582D7E, 1455841280,    +4136960, {         ~0,          +0,    0, 0xFFFF }, "Memory Card Utility Program" },
 	{{ "RELSAB\x00\x00" }, true,  0x44, 0xFCCE, 0x146E4A5A, 0x1E9563341CFB48F4, 1459947520,      +30720, { 1193673280,          +0, 6496, 0x8F7A }, "Summoner: The Prophecy" },
 	{{ "RELSAB\x00\x00" }, true,  0xD6, 0xD9CE, 0x16D7BCCE, 0xB64ADF7A4E8423B8, 1459978240,          +0, { 1193214528,          +0, 6496, 0x1458 }, "Summoner: The Prophecy" },
-#define TOTAL_GCM_COUNT (VALID_GCM_COUNT + 80)
+#define TOTAL_GCM_COUNT (VALID_GCM_COUNT + 82)
 };
 
 uint8_t fletcher8(const void *buffer, size_t size)

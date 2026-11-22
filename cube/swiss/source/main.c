@@ -186,14 +186,9 @@ void __SYS_PreInit(void)
 }
 
 uiDrawObj_t *configProgBar = NULL;
-void config_migration(char* text, int state, int percent) {
+void config_migration(char* text, int state) {
 	if(state) {
-		if(percent < 0) {
-			configProgBar = DrawPublish(DrawProgressBar(percent == -2, 0, text));
-		}
-		else {
-			DrawUpdateProgressBar(configProgBar, percent);
-		}
+		configProgBar = DrawRepublish(configProgBar, DrawProgressBar(true, 0, text));
 	}
 	else {
 		if(configProgBar) {
@@ -288,7 +283,7 @@ int main(int argc, char *argv[])
 	print_debug("Arena Size: %iKB\n",SYS_GetArenaSize()/1024);
 	print_debug("DVD Drive Present? %s\n",swissSettings.hasDVDDrive?"Yes":"No");
 	print_debug("GIT Commit: %s\n", GIT_COMMIT);
-	print_debug("GIT Revision: %s\n", GIT_REVISION);
+	print_debug("GIT Revision: %i\n", GIT_REVISION);
 	
 	// Go through all devices with FEAT_BOOT_DEVICE feature and set it as current if one is available
 	for(i = 0; i < MAX_DEVICES; i++) {
@@ -358,6 +353,7 @@ int main(int argc, char *argv[])
 		swissSettings.sramHOffset &= ~1;
 	}
 	VIDEO_SetAdjustingValues(swissSettings.sramHOffset, 0);
+	updateTZ(swissSettings.timeZone);
 	updateSRAM(&swissSettings, true);
 	
 	if(swissSettings.initNetworkAtStart |= bba_requires_init()) {

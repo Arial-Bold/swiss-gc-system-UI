@@ -73,7 +73,8 @@ extern u32 __SYS_UnlockSramEx(u32 write);
 extern u32 __SYS_SyncSram(void);
 extern u32 __SYS_CheckSram(void);
 extern void __SYS_ReadROM(void *buf,u32 len,u32 offset);
-extern u32 __SYS_SetRTC(u32 gctime);
+extern u32 __SYS_GetRTC(u32 *rtc);
+extern u32 __SYS_SetRTC(u32 rtc);
 extern void __SYS_InitTime(void);
 extern u8 __SYS_SetTAUCalibration(s8 calib);
 
@@ -95,7 +96,7 @@ extern void select_speed();
 extern int select_slot();
 extern void select_device(int type);
 extern bool select_dest_dir(file_handle* initial, char* selection);
-extern void select_timezone(char* selection);
+extern bool select_timezone(char* selection);
 
 typedef struct {
 	int cubebootInvoked;

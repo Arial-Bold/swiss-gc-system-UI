@@ -123,7 +123,7 @@ s32 deviceHandler_FAT_readDir(file_handle* ffile, file_handle** dir, u32 type) {
 			// Make sure we have room for this one
 			if(num_entries == i) {
 				num_entries *= 2;
-				*dir = reallocarray(*dir, num_entries, sizeof(file_handle));
+				if(reallocarr(dir, num_entries, sizeof(file_handle))) break;
 			}
 			memset(&(*dir)[i], 0, sizeof(file_handle));
 			if(concat_path((*dir)[i].name, ffile->name, entry.fname) < PATHNAME_MAX && entry.fsize <= UINT32_MAX) {
@@ -139,7 +139,7 @@ s32 deviceHandler_FAT_readDir(file_handle* ffile, file_handle** dir, u32 type) {
 	}
 	if(num_entries != i) {
 		num_entries = i;
-		*dir = reallocarray(*dir, num_entries, sizeof(file_handle));
+		reallocarr(dir, num_entries, sizeof(file_handle));
 	}
 	
 	f_closedir(dp);
@@ -261,12 +261,10 @@ s32 deviceHandler_FAT_setupFile(file_handle* file, file_handle* file2, Executabl
 	}
 	
 	if(swissSettings.emulateMemoryCard) {
+		ensure_path(DEVICE_CUR, "swiss/saves", NULL, false);
 		if(devices[DEVICE_CUR] != &__device_sd_a && devices[DEVICE_CUR] != &__device_ata_a && devices[DEVICE_CUR] != &__device_ata_c) {
 			memset(&patchFile, 0, sizeof(file_handle));
-			concatf_path(patchFile.name, devices[DEVICE_CUR]->initial->name, "swiss/patches/MemoryCardA.%s.raw", wodeRegionToString(GCMDisk.RegionCode));
-			concatf_path(txtbuffer, devices[DEVICE_CUR]->initial->name, "swiss/saves/MemoryCardA.%s.raw", wodeRegionToString(GCMDisk.RegionCode));
-			ensure_path(DEVICE_CUR, "swiss/saves", NULL, false);
-			devices[DEVICE_CUR]->renameFile(&patchFile, txtbuffer);	// TODO remove this in our next major release
+			concatf_path(patchFile.name, devices[DEVICE_CUR]->initial->name, "swiss/saves/MemoryCardA.%s.raw", wodeRegionToString(GCMDisk.RegionCode));
 			
 			if(devices[DEVICE_CUR]->statFile(&patchFile)) {
 				devices[DEVICE_CUR]->seekFile(&patchFile, 16*1024*1024, DEVICE_HANDLER_SEEK_SET);
@@ -281,10 +279,7 @@ s32 deviceHandler_FAT_setupFile(file_handle* file, file_handle* file2, Executabl
 		
 		if(devices[DEVICE_CUR] != &__device_sd_b && devices[DEVICE_CUR] != &__device_ata_b) {
 			memset(&patchFile, 0, sizeof(file_handle));
-			concatf_path(patchFile.name, devices[DEVICE_CUR]->initial->name, "swiss/patches/MemoryCardB.%s.raw", wodeRegionToString(GCMDisk.RegionCode));
-			concatf_path(txtbuffer, devices[DEVICE_CUR]->initial->name, "swiss/saves/MemoryCardB.%s.raw", wodeRegionToString(GCMDisk.RegionCode));
-			ensure_path(DEVICE_CUR, "swiss/saves", NULL, false);
-			devices[DEVICE_CUR]->renameFile(&patchFile, txtbuffer);	// TODO remove this in our next major release
+			concatf_path(patchFile.name, devices[DEVICE_CUR]->initial->name, "swiss/saves/MemoryCardB.%s.raw", wodeRegionToString(GCMDisk.RegionCode));
 			
 			if(devices[DEVICE_CUR]->statFile(&patchFile)) {
 				devices[DEVICE_CUR]->seekFile(&patchFile, 16*1024*1024, DEVICE_HANDLER_SEEK_SET);

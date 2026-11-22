@@ -18,20 +18,19 @@
  */
 
 #include <ogc/system.h>
+#include <ogc/timesupp.h>
 #include <stdbool.h>
+#include <stdckdint.h>
 #include <stdlib.h>
 #include <time.h>
 #include "deviceHandler.h"
 #include "sram.h"
 #include "swiss.h"
+#include "tzdata.h"
 
 static s32 onreset(s32 final)
 {
-	if (!final) {
-		updateSRAM(&swissSettings, false);
-		unsetenv("TZ");
-	}
-
+	if (!final) updateSRAM(&swissSettings, false);
 	return TRUE;
 }
 
@@ -54,6 +53,34 @@ static void initSRAM(void)
 
 	__SYS_UnlockSram(writeSram);
 	while (!__SYS_SyncSram());
+
+	u32 rtc, epoch;
+	s32 counterBias = SYS_GetCounterBias();
+
+	if (!ckd_sub(&epoch, GIT_TIMESTAMP, DIFF_SEC_1970_2000) && __SYS_GetRTC(&rtc)) {
+		if (rtc < epoch) {
+			if (rtc + counterBias + 12 * TB_SECSPERHR < epoch ||
+				ckd_sub(&counterBias, rtc + counterBias, epoch)) {
+				__SYS_SetRTC(epoch);
+				__SYS_SetPosixTime(secs_to_ticks(GIT_TIMESTAMP));
+				__SYS_SetTime(secs_to_ticks(epoch));
+				SYS_SetCounterBias(0);
+			} else {
+				__SYS_SetRTC(epoch);
+				SYS_SetCounterBias(counterBias);
+			}
+		} else if (ckd_add(&rtc, rtc, counterBias)) {
+			if (ckd_sub(&counterBias, rtc, epoch)) {
+				__SYS_SetRTC(epoch);
+				__SYS_SetPosixTime(secs_to_ticks(GIT_TIMESTAMP));
+				__SYS_SetTime(secs_to_ticks(epoch));
+				SYS_SetCounterBias(0);
+			} else {
+				__SYS_SetRTC(epoch);
+				SYS_SetCounterBias(counterBias);
+			}
+		}
+	}
 
 	SYS_RegisterResetFunc(&resetinfo);
 }
@@ -112,4 +139,64 @@ void updateSRAM(SwissSettings *settings, bool syncSram)
 
 	__SYS_UnlockSramEx(writeSram);
 	while (syncSram && !__SYS_SyncSram());
+
+	if (syncSram) __SYS_InitTime();
+}
+
+void updateRTC(time_t now)
+{
+	u32 rtc;
+
+	if (now < GIT_TIMESTAMP || ckd_sub(&rtc, now, DIFF_SEC_1970_2000))
+		return;
+
+	now = (time_t)(getenv("TZ") ? rtc : rtc + SYS_GetCounterBias()) + DIFF_SEC_1970_2000;
+
+	__SYS_SetRTC(rtc);
+	__SYS_SetPosixTime(secs_to_ticks(now));
+}
+
+void updateTime(time_t now)
+{
+	u32 sec0, sec1;
+
+	if (getenv("TZ")) {
+		updateRTC(now);
+	} else if (!ckd_sub(&sec1, now, DIFF_SEC_1970_2000) &&
+		__SYS_GetRTC(&sec0)) {
+		__SYS_SetPosixTime(secs_to_ticks(now));
+		__SYS_SetTime(secs_to_ticks(sec1));
+		SYS_SetCounterBias(sec1 - sec0);
+	}
+}
+
+void updateTZ(const char *name)
+{
+	const char *tzenv = get_timezone(name);
+	int adjust = 0;
+
+	if (getenv("TZ")) {
+		if (tzenv) {
+			setenv("TZ", tzenv, 1);
+			tzset();
+		} else {
+			unsetenv("TZ");
+			tzset();
+			adjust = -1;
+		}
+	} else if (tzenv) {
+		setenv("TZ", tzenv, 0);
+		tzset();
+		adjust = 1;
+	}
+
+	if (adjust) {
+		u32 sec0 = ticks_to_secs(gettime());
+		u32 sec1 = sec0 - SYS_GetCounterBias();
+
+		s64 tick0 = secs_to_ticks(sec0);
+		s64 tick1 = secs_to_ticks(sec1);
+
+		__SYS_AdjustPosixTime((tick1 - tick0) * adjust);
+	}
 }
